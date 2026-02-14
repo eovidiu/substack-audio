@@ -15,6 +15,10 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from feedgen.feed import FeedGenerator
+try:
+    import cloudscraper  # type: ignore
+except Exception:  # pragma: no cover
+    cloudscraper = None
 
 
 def env(name: str, default: str = "") -> str:
@@ -201,6 +205,15 @@ def fetch_feed_xml(feed_url: str, timeout: int = 30) -> str:
                 time.sleep(attempt * 2)
                 continue
             raise
+
+    # Last resort for Cloudflare-protected endpoints on CI runner IP ranges.
+    if cloudscraper is not None:
+        scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "darwin", "mobile": False}
+        )
+        resp = scraper.get(feed_url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+        return resp.text
 
     raise RuntimeError(f"Failed to fetch feed: {feed_url}") from last_exc
 
