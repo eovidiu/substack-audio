@@ -159,6 +159,37 @@ def parse_archive_json(archive_json: str) -> List[Dict]:
     return items
 
 
+def parse_posts_json(posts_json: str) -> List[Dict]:
+    rows = json.loads(posts_json)
+    items: List[Dict] = []
+    for row in rows:
+        title = (row.get("title") or "Untitled").strip()
+        link = (row.get("canonical_url") or "").strip()
+        guid = str(row.get("id") or link or title).strip()
+        pub_date = (row.get("post_date") or "").strip()
+        description = (row.get("description") or row.get("subtitle") or "").strip()
+        content_html = row.get("body_html") or row.get("truncated_body_text") or description
+
+        author = ""
+        bylines = row.get("publishedBylines") or []
+        if bylines and isinstance(bylines, list):
+            first = bylines[0] or {}
+            author = (first.get("name") or "").strip()
+
+        items.append(
+            {
+                "title": title,
+                "link": link,
+                "guid": guid,
+                "pub_date": pub_date,
+                "description_html": description,
+                "content_html": content_html,
+                "author": author,
+            }
+        )
+    return items
+
+
 def parse_pub_date(pub_date: str) -> datetime:
     try:
         dt = email.utils.parsedate_to_datetime(pub_date)
@@ -246,6 +277,12 @@ def fetch_archive_json(feed_url: str, timeout: int = 30) -> str:
     base = feed_url.rsplit("/feed", 1)[0] if "/feed" in feed_url else feed_url.rstrip("/")
     archive_url = f"{base}/api/v1/archive?sort=new"
     return fetch_feed_xml(archive_url, timeout=timeout)
+
+
+def fetch_posts_json(feed_url: str, max_posts: int, timeout: int = 30) -> str:
+    base = feed_url.rsplit("/feed", 1)[0] if "/feed" in feed_url else feed_url.rstrip("/")
+    posts_url = f"{base}/api/v1/posts?limit={max(10, max_posts * 3)}"
+    return fetch_feed_xml(posts_url, timeout=timeout)
 
 
 def elevenlabs_tts(
@@ -406,9 +443,14 @@ def main() -> None:
         status = exc.response.status_code if exc.response is not None else None
         if status != 403:
             raise
-        print("RSS feed returned 403, falling back to Substack archive API...")
-        archive_json = fetch_archive_json(feed_url, timeout=30)
-        items = parse_archive_json(archive_json)
+        print("RSS feed returned 403, falling back to Substack posts API...")
+        try:
+            posts_json = fetch_posts_json(feed_url, max_posts=max_posts, timeout=30)
+            items = parse_posts_json(posts_json)
+        except requests.HTTPError:
+            print("Posts API returned 403, falling back to Substack archive API...")
+            archive_json = fetch_archive_json(feed_url, timeout=30)
+            items = parse_archive_json(archive_json)
 
     if not items:
         print("No items found in RSS feed.")
