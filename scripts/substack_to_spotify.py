@@ -198,13 +198,13 @@ def fetch_feed_xml(feed_url: str, timeout: int = 30) -> str:
             if code in (403, 429, 500, 502, 503, 504) and attempt < 3:
                 time.sleep(attempt * 2)
                 continue
-            raise
+            break
         except requests.RequestException as exc:
             last_exc = exc
             if attempt < 3:
                 time.sleep(attempt * 2)
                 continue
-            raise
+            break
 
     # Last resort for Cloudflare-protected endpoints on CI runner IP ranges.
     if cloudscraper is not None:
