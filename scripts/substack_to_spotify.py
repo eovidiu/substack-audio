@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from elevenlabs.client import ElevenLabs
 from feedgen.feed import FeedGenerator
 try:
     import cloudscraper  # type: ignore
@@ -286,26 +287,21 @@ def fetch_posts_json(feed_url: str, max_posts: int, timeout: int = 30) -> str:
 
 
 def elevenlabs_tts(
-    api_key: str,
+    client: ElevenLabs,
     voice_id: str,
     model_id: str,
     output_format: str,
     text: str,
 ) -> bytes:
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": api_key,
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "text": text,
-        "model_id": model_id,
-        "output_format": output_format,
-    }
-    resp = requests.post(url, headers=headers, json=payload, timeout=120)
-    resp.raise_for_status()
-    return resp.content
+    audio = client.text_to_speech.convert(
+        text=text,
+        voice_id=voice_id,
+        model_id=model_id,
+        output_format=output_format,
+    )
+    if isinstance(audio, (bytes, bytearray)):
+        return bytes(audio)
+    return b"".join(chunk for chunk in audio if isinstance(chunk, (bytes, bytearray)))
 
 
 def concat_mp3(parts: List[Path], output_file: Path) -> None:
@@ -429,6 +425,8 @@ def main() -> None:
     if not public_base_url:
         raise SystemExit("Missing PUBLIC_BASE_URL")
 
+    elevenlabs_client = ElevenLabs(api_key=api_key)
+
     output_audio_dir.mkdir(parents=True, exist_ok=True)
 
     state = load_json(state_file, {"processed_guids": []})
@@ -484,7 +482,7 @@ def main() -> None:
         for idx, chunk in enumerate(chunks, start=1):
             print(f"  chunk {idx}/{len(chunks)}")
             audio_bytes = elevenlabs_tts(
-                api_key=api_key,
+                client=elevenlabs_client,
                 voice_id=voice_id,
                 model_id=model_id,
                 output_format=output_format,
