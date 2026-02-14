@@ -187,6 +187,29 @@ def fetch_feed_xml(feed_url: str, timeout: int = 30) -> str:
     session = requests.Session()
     last_exc = None
 
+    # CI-friendly first try: curl often passes Cloudflare checks where requests fails.
+    try:
+        curl_cmd = [
+            "curl",
+            "-fsSL",
+            "--max-time",
+            str(timeout),
+            "-A",
+            headers["User-Agent"],
+            "-H",
+            f"Accept: {headers['Accept']}",
+            "-H",
+            f"Accept-Language: {headers['Accept-Language']}",
+            "-H",
+            f"Referer: {headers['Referer']}",
+            feed_url,
+        ]
+        curl_resp = subprocess.run(curl_cmd, check=True, capture_output=True, text=True)
+        if curl_resp.stdout.strip():
+            return curl_resp.stdout
+    except Exception as exc:
+        last_exc = exc
+
     for attempt in range(1, 4):
         try:
             resp = session.get(feed_url, headers=headers, timeout=timeout)
