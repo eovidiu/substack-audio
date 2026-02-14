@@ -124,6 +124,37 @@ def parse_rss(feed_xml: str) -> List[Dict]:
     return items
 
 
+def parse_archive_json(archive_json: str) -> List[Dict]:
+    rows = json.loads(archive_json)
+    items: List[Dict] = []
+    for row in rows:
+        title = (row.get("title") or "Untitled").strip()
+        link = (row.get("canonical_url") or "").strip()
+        guid = str(row.get("id") or link or title).strip()
+        pub_date = (row.get("post_date") or "").strip()
+        description = (row.get("description") or row.get("subtitle") or "").strip()
+        content_html = row.get("body_html") or row.get("truncated_body_text") or description
+
+        author = ""
+        bylines = row.get("publishedBylines") or []
+        if bylines and isinstance(bylines, list):
+            first = bylines[0] or {}
+            author = (first.get("name") or "").strip()
+
+        items.append(
+            {
+                "title": title,
+                "link": link,
+                "guid": guid,
+                "pub_date": pub_date,
+                "description_html": description,
+                "content_html": content_html,
+                "author": author,
+            }
+        )
+    return items
+
+
 def parse_pub_date(pub_date: str) -> datetime:
     try:
         dt = email.utils.parsedate_to_datetime(pub_date)
@@ -172,6 +203,13 @@ def fetch_feed_xml(feed_url: str, timeout: int = 30) -> str:
             raise
 
     raise RuntimeError(f"Failed to fetch feed: {feed_url}") from last_exc
+
+
+def fetch_archive_json(feed_url: str, timeout: int = 30) -> str:
+    # Convert /feed URL to archive API endpoint.
+    base = feed_url.rsplit("/feed", 1)[0] if "/feed" in feed_url else feed_url.rstrip("/")
+    archive_url = f"{base}/api/v1/archive?sort=new"
+    return fetch_feed_xml(archive_url, timeout=timeout)
 
 
 def elevenlabs_tts(
@@ -325,8 +363,16 @@ def main() -> None:
     episodes: List[Dict] = load_json(episodes_file, [])
 
     print(f"Fetching Substack feed: {feed_url}")
-    feed_xml = fetch_feed_xml(feed_url, timeout=30)
-    items = parse_rss(feed_xml)
+    try:
+        feed_xml = fetch_feed_xml(feed_url, timeout=30)
+        items = parse_rss(feed_xml)
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        if status != 403:
+            raise
+        print("RSS feed returned 403, falling back to Substack archive API...")
+        archive_json = fetch_archive_json(feed_url, timeout=30)
+        items = parse_archive_json(archive_json)
 
     if not items:
         print("No items found in RSS feed.")
