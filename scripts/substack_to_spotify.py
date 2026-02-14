@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
@@ -131,6 +132,46 @@ def parse_pub_date(pub_date: str) -> datetime:
         return dt.astimezone(timezone.utc)
     except Exception:
         return datetime.now(timezone.utc)
+
+
+def fetch_feed_xml(feed_url: str, timeout: int = 30) -> str:
+    # Substack may return 403 to generic bot fingerprints; emulate an RSS reader/browser.
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/122.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.1",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Referer": feed_url.rsplit("/", 1)[0],
+    }
+
+    session = requests.Session()
+    last_exc = None
+
+    for attempt in range(1, 4):
+        try:
+            resp = session.get(feed_url, headers=headers, timeout=timeout)
+            resp.raise_for_status()
+            return resp.text
+        except requests.HTTPError as exc:
+            last_exc = exc
+            code = exc.response.status_code if exc.response is not None else None
+            if code in (403, 429, 500, 502, 503, 504) and attempt < 3:
+                time.sleep(attempt * 2)
+                continue
+            raise
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < 3:
+                time.sleep(attempt * 2)
+                continue
+            raise
+
+    raise RuntimeError(f"Failed to fetch feed: {feed_url}") from last_exc
 
 
 def elevenlabs_tts(
@@ -284,9 +325,8 @@ def main() -> None:
     episodes: List[Dict] = load_json(episodes_file, [])
 
     print(f"Fetching Substack feed: {feed_url}")
-    rss_resp = requests.get(feed_url, timeout=30)
-    rss_resp.raise_for_status()
-    items = parse_rss(rss_resp.text)
+    feed_xml = fetch_feed_xml(feed_url, timeout=30)
+    items = parse_rss(feed_xml)
 
     if not items:
         print("No items found in RSS feed.")
