@@ -250,7 +250,64 @@ Add `.env` to the podcast repo's `.gitignore`:
 grep -qxF '.env' "<podcast-repo>/.gitignore" 2>/dev/null || echo ".env" >> "<podcast-repo>/.gitignore"
 ```
 
-### Step 5: Set API secrets (only manual step)
+### Step 5: Write CLAUDE.md in the podcast repo
+
+Write a `CLAUDE.md` file in the podcast repo so that every future conversation opened in this folder has full context. Use the values collected in previous steps:
+
+```bash
+cat > "<podcast-repo>/CLAUDE.md" << 'CLAUDEEOF'
+# Podcast Project — Context for Claude
+
+## Environment
+
+- **Plugin directory:** <PLUGIN_DIR>
+- **uv path:** <UV>
+- **Podcast repo:** <podcast-repo>
+- **GitHub username:** <GH_USER>
+- **Git identity:** <GIT_NAME> <<GIT_EMAIL>>
+
+## CLI Commands
+
+All commands use the plugin's CLI via Bash:
+
+```
+"<UV>" run --directory "<PLUGIN_DIR>" python -m substack_audio.cli <command> [args]
+```
+
+Available commands:
+- `setup_check` — Check if all required config is set
+- `fetch_article <url>` — Fetch a Substack article
+- `generate_audio --title "..." --pub-date "..." --text-file /path --project-root "<podcast-repo>"` — Generate MP3
+- `update_feed --title "..." --description "..." --author "..." --link "..." --guid "..." --pub-date-iso "..." --audio-file "..." --audio-url "..." --audio-size-bytes N --project-root "<podcast-repo>"` — Add episode to feed
+- `list_episodes --project-root "<podcast-repo>"` — List all episodes
+- `cleanup --project-root "<podcast-repo>"` — Remove orphaned .part*.mp3 files
+- `get_config` — Read persistent plugin config
+- `save_config` — Save persistent config
+
+## Podcast Configuration
+
+- **Title:** <PODCAST_TITLE>
+- **Author:** <PODCAST_AUTHOR>
+- **Description:** <PODCAST_DESCRIPTION>
+- **Website:** <PODCAST_LINK>
+- **Email:** <PODCAST_EMAIL>
+- **Cover image:** <PODCAST_IMAGE_URL or "not set">
+- **Public URL:** https://<GH_USER>.github.io/<repo-name>
+- **Voice model:** <ELEVENLABS_MODEL_ID>
+
+## Critical Rules
+
+- **NEVER delete or reorder existing episodes** in episodes.json or feed.xml. Append only.
+- **NEVER ask the user to paste API keys** into the chat. Secrets live in `.env`.
+- **NEVER clone or pull the plugin code repo.** Plugin code is at the path above.
+- Git operations happen in THIS repo, not the plugin directory.
+- Always use `--project-root "<podcast-repo>"` for data commands.
+CLAUDEEOF
+```
+
+This file is safe to commit — it contains no secrets (API keys stay in `.env`).
+
+### Step 6: Set API secrets (only manual step)
 
 First, try to open the `.env` file directly in the user's default editor:
 ```bash
@@ -273,7 +330,7 @@ Then tell the user, including the full file path and a clickable link:
 >
 > Let me know when you're done and I'll verify everything works.
 
-### Step 6: Validate
+### Step 7: Validate
 
 After the user confirms they've set the secrets, run `setup_check`:
 
