@@ -133,10 +133,14 @@ First, verify git auth:
 git -C "<podcast-repo>" push --dry-run origin main 2>&1
 ```
 
-If the dry-run fails, help the user fix auth:
+If the dry-run fails, check SSH access:
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-which gh && gh auth status
+ssh -T git@github.com 2>&1 || true
+```
+
+If SSH works but push fails, the remote URL may need updating:
+```bash
+git -C "<podcast-repo>" remote -v
 ```
 
 Once auth is confirmed, ask: "Ready to commit and push the new episode to GitHub? This will update the feed on GitHub Pages."

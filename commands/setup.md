@@ -23,11 +23,11 @@ Guide the user through configuring this plugin so they can generate podcast epis
 Claude Desktop CoWorks runs inside an **Ubuntu 22.04 Linux VM** (not macOS).
 
 - `python3`, `pip`, `git`, `curl`, `wget` are available out of the box
-- `uv`, `gh`, `brew` are NOT pre-installed
-- Only `gh` needs to be installed (for GitHub repo creation). Everything else uses built-in tools.
+- No tools need to be installed. Everything uses built-in system tools.
 - Plugin cache is mounted **read-only**
 - `open` command does not exist — use `file://` links and show paths instead
-- No `sudo` access — install tools to `$HOME/.local/bin`
+- No `sudo` access
+- The user's SSH keys are available for `git push`/`pull` operations
 
 ## How Commands Work
 
@@ -58,7 +58,7 @@ If not found via `/`, also try:
 find "$HOME" /sessions /mnt -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1
 ```
 
-Install Python dependencies (uses pip, no uv needed):
+Install Python dependencies (uses pip, no other tools needed):
 ```bash
 python3 -m pip install --user -r "$PLUGIN_DIR/requirements.txt" 2>&1 | tail -3
 ```
@@ -68,7 +68,7 @@ Test that the plugin loads:
 PYTHONPATH="$PLUGIN_DIR" python3 -c "import substack_audio; print('ok')"
 ```
 
-### Step 2: Git identity and GitHub authentication
+### Step 2: Git identity and GitHub username
 
 **Two separate things are needed and they are NOT the same:**
 - **Git identity** = display name for commits (e.g. "Ovidiu")
@@ -94,61 +94,25 @@ git config --global user.email "<email>"
 
 **GIT_NAME and GIT_EMAIL are only used for: commit authorship, PODCAST_AUTHOR default, PODCAST_EMAIL default. NEVER for repo URLs.**
 
-#### 2b. Install gh and authenticate with GitHub
+#### 2b. GitHub username
 
-Install `gh` CLI (single binary, no package manager needed):
+Ask the user: "What's your GitHub username? (This is your login, e.g. 'eovidiu', not your display name)"
+
+Store this as `GH_USER`.
+
+Verify SSH access to GitHub works:
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-mkdir -p "$HOME/.local/bin"
-command -v gh 2>/dev/null && echo "gh found" || {
-  GH_VERSION="2.67.0"
-  ARCH="$(uname -m)"
-  [ "$ARCH" = "aarch64" ] && ARCH="arm64"
-  [ "$ARCH" = "x86_64" ] && ARCH="amd64"
-  curl -LsSf "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${ARCH}.tar.gz" | tar xz -C /tmp
-  cp /tmp/gh_${GH_VERSION}_linux_${ARCH}/bin/gh "$HOME/.local/bin/gh"
-  chmod +x "$HOME/.local/bin/gh"
-  gh --version
-}
+ssh -T git@github.com 2>&1 || true
 ```
 
-Tell the user before starting auth:
-
-> To connect to GitHub, you'll need to open a link in your browser and enter a one-time code. This is a one-time step.
-
-Check if already authenticated:
+This will print something like "Hi eovidiu! You've successfully authenticated" if SSH keys are configured. If SSH fails, check for HTTPS credentials:
 ```bash
-gh auth status 2>&1
+git ls-remote https://github.com/<GH_USER>/<GH_USER>.git 2>&1 | head -1 || true
 ```
 
-If not authenticated, start the device code flow:
-```bash
-gh auth login --hostname github.com --git-protocol https --web
-```
+If neither works, tell the user they need to set up SSH keys or git credentials for GitHub before proceeding.
 
-This prints a URL (https://github.com/login/device) and a code. Present both clearly and wait for the user to confirm they've authorized.
-
-If `--web` fails, fall back to token-based auth:
-```bash
-gh auth login --hostname github.com --git-protocol https --with-token
-```
-Tell the user: "Create a token at https://github.com/settings/tokens/new with scopes: `repo`, `read:org`, `workflow`."
-
-#### 2c. Get GitHub username — MANDATORY STEP
-
-**This step is MANDATORY. Do NOT skip it. Do NOT proceed without it.**
-
-After the user confirms they've authorized, run:
-```bash
-GH_USER=$(gh api user --jq '.login')
-echo "GitHub username: $GH_USER"
-```
-
-Present to the user: "Your GitHub account is **<GH_USER>**. Repos will be created under github.com/**<GH_USER>**/. Is that correct?"
-
-**Wait for confirmation before proceeding.**
-
-**REMEMBER: GH_USER (e.g. "eovidiu") ≠ GIT_NAME (e.g. "Ovidiu"). For the rest of this setup, use GH_USER for all GitHub URLs, repo names, and Pages URLs. Use GIT_NAME only for podcast author name.**
+**REMEMBER: GH_USER (e.g. "eovidiu") ≠ GIT_NAME (e.g. "Ovidiu"). For the rest of this setup, use GH_USER for all GitHub URLs and Pages URLs. Use GIT_NAME only for podcast author name.**
 
 ### Step 3: Podcast repo setup
 
@@ -162,19 +126,16 @@ Ask the user for:
 - A repo name (e.g., `my-podcast`)
 - Where to create it locally (e.g., `~/work` — the repo will be `~/work/my-podcast`)
 
-Then present a summary and **ask for confirmation before executing**:
+Then tell the user:
 
-> I'm going to:
-> 1. Create a local directory at `<parent-dir>/<repo-name>`
-> 2. Initialize a git repo with the GitHub Pages deploy workflow
-> 3. Create a public GitHub repo `<GH_USER>/<repo-name>` (using GitHub username **<GH_USER>**, not "<GIT_NAME>")
-> 4. Push the initial commit
-> 5. Enable GitHub Pages
+> Please create a new **public** repository called **<repo-name>** on GitHub:
+> https://github.com/new
 >
-> Ready to proceed?
+> Leave it empty (no README, no .gitignore, no license). Let me know when it's created.
 
-**Only after the user confirms**, execute via Bash:
+**Wait for the user to confirm the repo is created.**
 
+Then set up the local repo and push:
 ```bash
 mkdir -p <parent-dir>/<repo-name>
 cd <parent-dir>/<repo-name>
@@ -187,16 +148,23 @@ cp "$PLUGIN_DIR/.github/workflows/podcast.yml" .github/workflows/
 git add .github/workflows/podcast.yml
 git commit -m "Add GitHub Pages deploy workflow"
 
-gh repo create <repo-name> --public --source=. --push
-
-gh api "repos/$GH_USER/<repo-name>/pages" -X POST -f "build_type=workflow" 2>/dev/null || echo "Pages may need manual setup at: https://github.com/$GH_USER/<repo-name>/settings/pages"
+git remote add origin git@github.com:<GH_USER>/<repo-name>.git
+git branch -M main
+git push -u origin main
 ```
 
-Verify:
+If SSH push fails, try HTTPS:
 ```bash
-git log --oneline -1
-gh repo view $GH_USER/<repo-name> --json url --jq '.url'
+git remote set-url origin https://github.com/<GH_USER>/<repo-name>.git
+git push -u origin main
 ```
+
+After successful push, tell the user:
+
+> Repo is live! One more thing — enable GitHub Pages so your podcast feed is published:
+> https://github.com/<GH_USER>/<repo-name>/settings/pages
+>
+> Under **Source**, select **GitHub Actions**. That's it.
 
 **If yes — use existing repo:**
 - Ask for the local path to the repo
@@ -217,7 +185,7 @@ PYTHONPATH="$PLUGIN_DIR" python3 -m substack_audio.cli save_config --podcast-rep
 At this point you have:
 - **GIT_NAME** (display name from Step 2a, e.g. "Ovidiu") → default for `PODCAST_AUTHOR`
 - **GIT_EMAIL** (from Step 2a) → default for `PODCAST_EMAIL`
-- **GH_USER** (GitHub login from Step 2c, e.g. "eovidiu") → used in `PUBLIC_BASE_URL`
+- **GH_USER** (GitHub login from Step 2b, e.g. "eovidiu") → used in `PUBLIC_BASE_URL`
 - **repo name** (from Step 3) → used in `PUBLIC_BASE_URL`
 
 **IMPORTANT: GH_USER and GIT_NAME are different. Use GH_USER for PUBLIC_BASE_URL, never GIT_NAME.**
