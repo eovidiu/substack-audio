@@ -17,15 +17,16 @@ The podcast repo path is stored in `data/config.json` in the plugin directory (v
 
 ## CLI Commands
 
-All commands run via Bash. No MCP server, no connector.
+All commands run via Bash using `python3` with `PYTHONPATH`. No `uv`, no MCP server, no connector.
 
 ```bash
-# Ensure uv is on PATH (sandbox may not have it pre-installed)
-export PATH="$HOME/.local/bin:$PATH"
-command -v uv 2>/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh; }
-
 PLUGIN_DIR="<path to this directory>"
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
+PYTHONPATH="$PLUGIN_DIR" python3 -m substack_audio.cli <command> [args]
+```
+
+If dependencies are missing, install them first:
+```bash
+python3 -m pip install --user -r "$PLUGIN_DIR/requirements.txt"
 ```
 
 Available commands:

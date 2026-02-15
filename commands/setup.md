@@ -22,45 +22,30 @@ Guide the user through configuring this plugin so they can generate podcast epis
 
 Claude Desktop CoWorks runs inside an **Ubuntu 22.04 Linux VM** (not macOS).
 
-- `python3`, `git`, `curl`, `wget` are available
-- `uv`, `gh`, `brew` are NOT pre-installed — install them at setup time
-- User files are mounted under `/sessions/*/mnt/` or `$HOME`
+- `python3`, `pip`, `git`, `curl`, `wget` are available out of the box
+- `uv`, `gh`, `brew` are NOT pre-installed
+- Only `gh` needs to be installed (for GitHub repo creation). Everything else uses built-in tools.
 - Plugin cache is mounted **read-only**
 - `open` command does not exist — use `file://` links and show paths instead
 - No `sudo` access — install tools to `$HOME/.local/bin`
 
 ## How Commands Work
 
-All plugin commands run via Bash using `uv` and the CLI.
+All plugin commands run via `python3` with `PYTHONPATH` set to the plugin directory.
 
 ```bash
-# Ensure uv is installed and on PATH
-export PATH="$HOME/.local/bin:$PATH"
-
 # Find the plugin directory (where pyproject.toml lives)
 PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
 
 # Run any CLI command
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
+PYTHONPATH="$PLUGIN_DIR" python3 -m substack_audio.cli <command> [args]
 ```
+
+Store `PLUGIN_DIR` at the start and reuse it throughout.
 
 ## Workflow
 
-### Step 1: Install tools and find plugin
-
-First, ensure `uv` is available:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-command -v uv 2>/dev/null && echo "uv found: $(uv --version)" || echo "uv not found, installing..."
-```
-
-If `uv` is not found, install it (works on Linux ARM64/x86_64):
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-uv --version
-```
+### Step 1: Find plugin and install Python dependencies
 
 Locate the plugin directory:
 ```bash
@@ -73,33 +58,23 @@ If not found via `/`, also try:
 find "$HOME" /sessions /mnt -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1
 ```
 
-Install dependencies (into a writable location — the venv goes in the default uv cache, not the read-only plugin dir):
+Install Python dependencies (uses pip, no uv needed):
 ```bash
-uv sync --directory "$PLUGIN_DIR"
+python3 -m pip install --user -r "$PLUGIN_DIR/requirements.txt" 2>&1 | tail -3
 ```
 
-Test:
+Test that the plugin loads:
 ```bash
-uv run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
-```
-
-Next, install `gh` CLI for GitHub operations:
-```bash
-command -v gh 2>/dev/null && echo "gh found" || {
-  GH_VERSION="2.67.0"
-  ARCH="$(uname -m)"
-  [ "$ARCH" = "aarch64" ] && ARCH="arm64"
-  [ "$ARCH" = "x86_64" ] && ARCH="amd64"
-  curl -LsSf "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${ARCH}.tar.gz" | tar xz -C /tmp
-  cp /tmp/gh_${GH_VERSION}_linux_${ARCH}/bin/gh "$HOME/.local/bin/gh"
-  chmod +x "$HOME/.local/bin/gh"
-  gh --version
-}
+PYTHONPATH="$PLUGIN_DIR" python3 -c "import substack_audio; print('ok')"
 ```
 
 ### Step 2: Git identity and GitHub authentication
 
-**Two separate things are needed: git commit identity (display name) and GitHub account login (username).**
+**Two separate things are needed and they are NOT the same:**
+- **Git identity** = display name for commits (e.g. "Ovidiu")
+- **GitHub username** = the actual GitHub account login (e.g. "eovidiu")
+
+**You MUST resolve both separately. NEVER use the git display name as the GitHub username.**
 
 #### 2a. Git commit identity
 
@@ -117,14 +92,31 @@ git config --global user.name "<name>"
 git config --global user.email "<email>"
 ```
 
-**Store GIT_NAME and GIT_EMAIL — used later for PODCAST_AUTHOR and PODCAST_EMAIL defaults.**
+**GIT_NAME and GIT_EMAIL are only used for: commit authorship, PODCAST_AUTHOR default, PODCAST_EMAIL default. NEVER for repo URLs.**
 
-#### 2b. GitHub authentication
+#### 2b. Install gh and authenticate with GitHub
 
-The sandbox has no browser, so `gh` uses a **device code flow** — the user will need to open a URL in their own browser and enter a one-time code. Tell the user this before starting:
+Install `gh` CLI (single binary, no package manager needed):
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+mkdir -p "$HOME/.local/bin"
+command -v gh 2>/dev/null && echo "gh found" || {
+  GH_VERSION="2.67.0"
+  ARCH="$(uname -m)"
+  [ "$ARCH" = "aarch64" ] && ARCH="arm64"
+  [ "$ARCH" = "x86_64" ] && ARCH="amd64"
+  curl -LsSf "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${ARCH}.tar.gz" | tar xz -C /tmp
+  cp /tmp/gh_${GH_VERSION}_linux_${ARCH}/bin/gh "$HOME/.local/bin/gh"
+  chmod +x "$HOME/.local/bin/gh"
+  gh --version
+}
+```
 
-> To connect to GitHub, I'll generate a one-time code. You'll need to open a link in your browser and enter it. This is a one-time step.
+Tell the user before starting auth:
 
+> To connect to GitHub, you'll need to open a link in your browser and enter a one-time code. This is a one-time step.
+
+Check if already authenticated:
 ```bash
 gh auth status 2>&1
 ```
@@ -134,26 +126,29 @@ If not authenticated, start the device code flow:
 gh auth login --hostname github.com --git-protocol https --web
 ```
 
-This will print a URL (https://github.com/login/device) and a code. Present both clearly to the user and wait for them to confirm they've authorized.
+This prints a URL (https://github.com/login/device) and a code. Present both clearly and wait for the user to confirm they've authorized.
 
 If `--web` fails, fall back to token-based auth:
 ```bash
 gh auth login --hostname github.com --git-protocol https --with-token
 ```
-Tell the user: "Create a token at https://github.com/settings/tokens/new with scopes: `repo`, `read:org`, `workflow`. Then paste it here."
+Tell the user: "Create a token at https://github.com/settings/tokens/new with scopes: `repo`, `read:org`, `workflow`."
 
-#### 2c. Get GitHub username
+#### 2c. Get GitHub username — MANDATORY STEP
 
-**After successful auth**, get the actual GitHub login username (this is NOT the same as GIT_NAME):
+**This step is MANDATORY. Do NOT skip it. Do NOT proceed without it.**
 
+After the user confirms they've authorized, run:
 ```bash
 GH_USER=$(gh api user --jq '.login')
 echo "GitHub username: $GH_USER"
 ```
 
-**GH_USER is the GitHub login (e.g. "eovidiu"), not the git display name (e.g. "Ovidiu"). Use GH_USER for all repo URLs and GitHub operations. Use GIT_NAME only for commit identity and podcast author default.**
+Present to the user: "Your GitHub account is **<GH_USER>**. Repos will be created under github.com/**<GH_USER>**/. Is that correct?"
 
-**Do not proceed to repo creation until auth is confirmed and GH_USER is set.**
+**Wait for confirmation before proceeding.**
+
+**REMEMBER: GH_USER (e.g. "eovidiu") ≠ GIT_NAME (e.g. "Ovidiu"). For the rest of this setup, use GH_USER for all GitHub URLs, repo names, and Pages URLs. Use GIT_NAME only for podcast author name.**
 
 ### Step 3: Podcast repo setup
 
@@ -172,7 +167,7 @@ Then present a summary and **ask for confirmation before executing**:
 > I'm going to:
 > 1. Create a local directory at `<parent-dir>/<repo-name>`
 > 2. Initialize a git repo with the GitHub Pages deploy workflow
-> 3. Create a public GitHub repo `<GH_USER>/<repo-name>`
+> 3. Create a public GitHub repo `<GH_USER>/<repo-name>` (using GitHub username **<GH_USER>**, not "<GIT_NAME>")
 > 4. Push the initial commit
 > 5. Enable GitHub Pages
 >
@@ -214,17 +209,20 @@ gh repo view $GH_USER/<repo-name> --json url --jq '.url'
 
 **In both cases**, save the podcast repo path:
 ```bash
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
+PYTHONPATH="$PLUGIN_DIR" python3 -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
 ```
 
 ### Step 4: Collect podcast details and build .env
 
-At this point you know:
-- **GIT_NAME** (display name from Step 2a, e.g. "Ovidiu") → use as default for `PODCAST_AUTHOR`
-- **GIT_EMAIL** (from Step 2a) → use as default for `PODCAST_EMAIL`
-- **GH_USER** (GitHub login from Step 2c, e.g. "eovidiu") and **repo name** (from Step 3) → compute `PUBLIC_BASE_URL=https://<GH_USER>.github.io/<repo-name>`
+At this point you have:
+- **GIT_NAME** (display name from Step 2a, e.g. "Ovidiu") → default for `PODCAST_AUTHOR`
+- **GIT_EMAIL** (from Step 2a) → default for `PODCAST_EMAIL`
+- **GH_USER** (GitHub login from Step 2c, e.g. "eovidiu") → used in `PUBLIC_BASE_URL`
+- **repo name** (from Step 3) → used in `PUBLIC_BASE_URL`
 
-**IMPORTANT: GH_USER and GIT_NAME are different. Always use GH_USER (the GitHub login) for URLs and repo operations, never GIT_NAME.**
+**IMPORTANT: GH_USER and GIT_NAME are different. Use GH_USER for PUBLIC_BASE_URL, never GIT_NAME.**
+
+`PUBLIC_BASE_URL=https://<GH_USER>.github.io/<repo-name>`
 
 Ask the user the remaining questions. Present the inferred defaults and let them confirm or change:
 
@@ -284,12 +282,10 @@ cat > "<podcast-repo>/CLAUDE.md" << 'CLAUDEEOF'
 - **GitHub username:** <GH_USER>
 - **Git identity:** <GIT_NAME> <<GIT_EMAIL>>
 
-## Setup (run once per session if tools are missing)
+## Setup (run once per session if deps are missing)
 
 ```
-export PATH="$HOME/.local/bin:$PATH"
-command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
-command -v gh || echo "Install gh: see setup instructions"
+python3 -m pip install --user -r "<PLUGIN_DIR>/requirements.txt"
 ```
 
 ## CLI Commands
@@ -297,8 +293,7 @@ command -v gh || echo "Install gh: see setup instructions"
 All commands use the plugin's CLI via Bash:
 
 ```
-export PATH="$HOME/.local/bin:$PATH"
-uv run --directory "<PLUGIN_DIR>" python -m substack_audio.cli <command> [args]
+PYTHONPATH="<PLUGIN_DIR>" python3 -m substack_audio.cli <command> [args]
 ```
 
 Available commands:
@@ -357,8 +352,7 @@ Tell the user, including the full file path and a clickable link:
 After the user confirms they've set the secrets, run `setup_check`:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
+PYTHONPATH="$PLUGIN_DIR" python3 -m substack_audio.cli setup_check
 ```
 
 If `ready` is true:
