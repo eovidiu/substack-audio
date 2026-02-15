@@ -62,8 +62,8 @@ Violating this rule breaks podcast subscribers' feeds and can cause episodes to 
 
 ## Git Operations
 
-- Always verify git authentication is working before attempting to push (`git push --dry-run`).
-- Use the user's existing git credentials on their machine.
+- Push via HTTPS using `GITHUB_TOKEN` from `.env`. Temporarily set token in remote URL, push, then reset URL.
+- Never persist the token in `.git/config`.
 - Never force-push. Never push to a branch other than what the user specifies.
 - After pushing, verify the push succeeded before reporting success.
 - Git operations happen in the **podcast repo**, not the plugin directory.

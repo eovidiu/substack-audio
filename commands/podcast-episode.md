@@ -128,29 +128,34 @@ Show:
 
 ### Step 7: Git commit and push
 
-First, verify git auth:
-```bash
-git -C "<podcast-repo>" push --dry-run origin main 2>&1
-```
-
-If the dry-run fails, check SSH access:
-```bash
-ssh -T git@github.com 2>&1 || true
-```
-
-If SSH works but push fails, the remote URL may need updating:
-```bash
-git -C "<podcast-repo>" remote -v
-```
-
-Once auth is confirmed, ask: "Ready to commit and push the new episode to GitHub? This will update the feed on GitHub Pages."
+Ask: "Ready to commit and push the new episode to GitHub? This will update the feed on GitHub Pages."
 
 If confirmed:
 ```bash
 cd "<podcast-repo>"
 git add data/episodes.json data/state.json output/public/feed.xml output/public/audio/
 git commit -m "Add episode: <title>"
+
+# Read token from .env for HTTPS push
+GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' .env | cut -d= -f2-)"
+
+if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "your_github_token_here" ]; then
+  echo "ERROR: GITHUB_TOKEN not set in .env. Please add your GitHub Personal Access Token."
+  echo "Go to: https://github.com/settings/tokens > Generate new token (classic) > scope: repo"
+  exit 1
+fi
+
+# Get remote URL components
+REMOTE_URL="$(git remote get-url origin)"
+# Extract user/repo from HTTPS URL (https://github.com/user/repo.git)
+REPO_PATH="$(echo "$REMOTE_URL" | sed 's|https://github.com/||; s|https://.*@github.com/||; s|\.git$||')"
+
+# Push with token (temporarily set, then reset)
+git remote set-url origin "https://${GITHUB_TOKEN}@github.com/${REPO_PATH}.git"
 git push origin main
+git remote set-url origin "https://github.com/${REPO_PATH}.git"
+
+echo "Pushed successfully!"
 ```
 
 After push, verify:
