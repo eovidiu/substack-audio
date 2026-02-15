@@ -97,51 +97,63 @@ command -v gh 2>/dev/null && echo "gh found" || {
 }
 ```
 
-### Step 2: Git identity and authentication check
+### Step 2: Git identity and GitHub authentication
 
-Verify who the user is and that git works:
+**Two separate things are needed: git commit identity (display name) and GitHub account login (username).**
+
+#### 2a. Git commit identity
 
 ```bash
 GIT_NAME="$(git config --global user.name)"
 GIT_EMAIL="$(git config --global user.email)"
-echo "Git user: $GIT_NAME <$GIT_EMAIL>"
+echo "Git identity: $GIT_NAME <$GIT_EMAIL>"
 ```
 
-Present this to the user: "I'll be using this git identity: **<name> \<<email>\>**. Is that correct?"
+Present: "I'll use this git identity for commits: **<name> \<<email>\>**. Is that correct?"
 
-If git user/email is not set, ask for their name and email, then set it:
+If not set, ask for their name and email:
 ```bash
 git config --global user.name "<name>"
 git config --global user.email "<email>"
 ```
 
-**Store the git name and email — they will be used later to pre-fill `.env` values.**
+**Store GIT_NAME and GIT_EMAIL — used later for PODCAST_AUTHOR and PODCAST_EMAIL defaults.**
 
-Authenticate `gh`:
+#### 2b. GitHub authentication
+
+The sandbox has no browser, so `gh` uses a **device code flow** — the user will need to open a URL in their own browser and enter a one-time code. Tell the user this before starting:
+
+> To connect to GitHub, I'll generate a one-time code. You'll need to open a link in your browser and enter it. This is a one-time step.
+
 ```bash
 gh auth status 2>&1
 ```
 
-If not authenticated:
+If not authenticated, start the device code flow:
 ```bash
-gh auth login
+gh auth login --hostname github.com --git-protocol https --web
 ```
 
-Grab the GitHub username:
+This will print a URL (https://github.com/login/device) and a code. Present both clearly to the user and wait for them to confirm they've authorized.
+
+If `--web` fails, fall back to token-based auth:
+```bash
+gh auth login --hostname github.com --git-protocol https --with-token
+```
+Tell the user: "Create a token at https://github.com/settings/tokens/new with scopes: `repo`, `read:org`, `workflow`. Then paste it here."
+
+#### 2c. Get GitHub username
+
+**After successful auth**, get the actual GitHub login username (this is NOT the same as GIT_NAME):
+
 ```bash
 GH_USER=$(gh api user --jq '.login')
 echo "GitHub username: $GH_USER"
 ```
 
-If `gh auth login` fails (e.g. no browser available in sandbox), try token-based auth:
-```bash
-echo "Please create a personal access token at https://github.com/settings/tokens/new"
-echo "Scopes needed: repo, read:org, workflow"
-echo "Then paste it when prompted:"
-gh auth login --with-token
-```
+**GH_USER is the GitHub login (e.g. "eovidiu"), not the git display name (e.g. "Ovidiu"). Use GH_USER for all repo URLs and GitHub operations. Use GIT_NAME only for commit identity and podcast author default.**
 
-**Do not proceed to repo creation with broken auth.**
+**Do not proceed to repo creation until auth is confirmed and GH_USER is set.**
 
 ### Step 3: Podcast repo setup
 
@@ -208,9 +220,11 @@ uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podc
 ### Step 4: Collect podcast details and build .env
 
 At this point you know:
-- **GIT_NAME** (from Step 2) → use as default for `PODCAST_AUTHOR`
-- **GIT_EMAIL** (from Step 2) → use as default for `PODCAST_EMAIL`
-- **GH_USER** and **repo name** (from Steps 2-3) → compute `PUBLIC_BASE_URL=https://<GH_USER>.github.io/<repo-name>`
+- **GIT_NAME** (display name from Step 2a, e.g. "Ovidiu") → use as default for `PODCAST_AUTHOR`
+- **GIT_EMAIL** (from Step 2a) → use as default for `PODCAST_EMAIL`
+- **GH_USER** (GitHub login from Step 2c, e.g. "eovidiu") and **repo name** (from Step 3) → compute `PUBLIC_BASE_URL=https://<GH_USER>.github.io/<repo-name>`
+
+**IMPORTANT: GH_USER and GIT_NAME are different. Always use GH_USER (the GitHub login) for URLs and repo operations, never GIT_NAME.**
 
 Ask the user the remaining questions. Present the inferred defaults and let them confirm or change:
 
