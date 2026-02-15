@@ -17,7 +17,7 @@ Guide the user through configuring this plugin so they can generate podcast epis
 - **NEVER clone or pull the plugin's code repo.** The plugin ships as a zip — all code is already here.
 - **The plugin directory is READ-ONLY.** Never write files there. All user data (including `.env`) lives in the **podcast repo**.
 - **Automate everything possible.** Run commands via Bash.
-- **NEVER show VM-internal paths to the user** (e.g. `/sessions/abc-xyz/...`). Always refer to the podcast folder by the path the user provided. The VM may map user folders to internal paths — those are invisible to the user.
+- **NEVER show VM-internal paths to the user** (e.g. `/sessions/abc-xyz/...`). Always show paths relative to the user-chosen folder. The VM may map user folders to internal paths — those are invisible to the user.
 
 ## Sandbox Environment
 
