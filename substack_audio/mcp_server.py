@@ -187,7 +187,7 @@ def generate_audio(text: str, title: str, pub_date: str = "") -> dict:
             "Run the setup_check tool or /setup command to see what's needed."
         }
 
-    model_id = env("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+    model_id = env("ELEVENLABS_MODEL_ID", "eleven_v3_conversational")
     output_format = env("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")
     text_limit = int(env("ELEVENLABS_TEXT_LIMIT", "4500"))
     public_base_url = env("PUBLIC_BASE_URL")

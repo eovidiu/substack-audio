@@ -6,7 +6,7 @@
       "ELEVENLABS_API_KEY": "",
       "ELEVENLABS_VOICE_ID": "",
       "PUBLIC_BASE_URL": "",
-      "ELEVENLABS_MODEL_ID": "eleven_multilingual_v2",
+      "ELEVENLABS_MODEL_ID": "eleven_v3_conversational",
       "ELEVENLABS_OUTPUT_FORMAT": "mp3_44100_128",
       "ELEVENLABS_TEXT_LIMIT": "4500",
       "PODCAST_TITLE": "",
