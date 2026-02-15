@@ -112,7 +112,20 @@ echo "GitHub username: $GH_USER"
 
 If `gh` is available but not authenticated, run `gh auth login` now — before proceeding.
 
-If `gh` is not available, verify git can reach GitHub:
+If `gh` is not available, try to install it:
+```bash
+# macOS
+brew install gh 2>/dev/null || echo "brew not available"
+# Or official installer
+command -v gh 2>/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null && echo "installed" || echo "could not install gh")
+```
+
+If `gh` was just installed, authenticate it:
+```bash
+gh auth login
+```
+
+If `gh` still cannot be installed, verify git can reach GitHub as a last resort:
 ```bash
 git ls-remote https://github.com/octocat/Hello-World.git HEAD 2>&1 | head -1
 ```
@@ -125,15 +138,24 @@ The user needs a git repo for their podcast data (episodes, feed, audio files). 
 
 Ask: "Do you have a GitHub repository set up for this podcast? If so, what's the local path?"
 
-**If no — create one automatically via Bash:**
+**If no — create one:**
 
 Ask the user for:
 - A repo name (e.g., `my-podcast`)
 - Where to create it locally (e.g., `~/work` — the repo will be `~/work/my-podcast`)
 
-Use `gh` or plain `git` based on what was detected in Step 2.
+Then present a summary and **ask for confirmation before executing**:
 
-**If `gh` is available (from Step 2):**
+> I'm going to:
+> 1. Create a local directory at `<parent-dir>/<repo-name>`
+> 2. Initialize a git repo with the GitHub Pages deploy workflow
+> 3. Create a public GitHub repo `<GH_USER>/<repo-name>`
+> 4. Push the initial commit
+> 5. Enable GitHub Pages
+>
+> Ready to proceed?
+
+**Only after the user confirms**, execute everything via Bash. `gh` is required for this — it should have been installed and authenticated in Step 2.
 
 ```bash
 # Create the repo directory locally
@@ -158,33 +180,20 @@ gh repo create <repo-name> --public --source=. --push
 gh api "repos/$GH_USER/<repo-name>/pages" -X POST -f "build_type=workflow" 2>/dev/null || echo "Pages may need manual setup at: https://github.com/$GH_USER/<repo-name>/settings/pages"
 ```
 
-**If `gh` is NOT available — use plain git:**
-
-Ask the user for their GitHub username, then:
+Verify the push worked:
 ```bash
-# Create the repo directory locally
-mkdir -p <parent-dir>/<repo-name>
-cd <parent-dir>/<repo-name>
-git init
-
-# Create required directories
-mkdir -p data output/public/audio .github/workflows
-
-# Copy GitHub Pages workflow from plugin
-cp "$PLUGIN_DIR/.github/workflows/podcast.yml" .github/workflows/
-
-# Initial commit
-git add .github/workflows/podcast.yml
-git commit -m "Add GitHub Pages deploy workflow"
+git log --oneline -1
+gh repo view <GH_USER>/<repo-name> --json url --jq '.url'
 ```
 
-Then ask the user to create the repo on GitHub (https://github.com/new) and provide the repo URL. Once they do:
-```bash
-git remote add origin https://github.com/<username>/<repo-name>.git
-git push -u origin main
-```
-
-Tell the user: "Go to your repo Settings > Pages > Source: GitHub Actions to enable GitHub Pages."
+If `gh` is truly not available (install failed in Step 2), fall back to manual repo creation as a **last resort**:
+- Ask the user to create the repo at https://github.com/new
+- Then wire up the remote and push automatically:
+  ```bash
+  git remote add origin https://github.com/<username>/<repo-name>.git
+  git push -u origin main
+  ```
+- Tell the user: "Go to your repo Settings > Pages > Source: GitHub Actions to enable GitHub Pages."
 
 **If yes — use existing repo:**
 - Ask for the local path to the repo
