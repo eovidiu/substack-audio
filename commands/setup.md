@@ -131,7 +131,7 @@ uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
 ### Step 5: Voice model selection
 
 Ask the user which ElevenLabs model they want to use:
-- **eleven_v3_conversational** (default) — Latest v3 model with enhanced quality
+- **eleven_v3** (default) — Latest v3 model with enhanced quality
 - **eleven_multilingual_v2** — Proven multilingual model, good for non-English content
 - **eleven_flash_v2_5** — Faster generation, slightly lower quality
 

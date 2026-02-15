@@ -135,7 +135,7 @@ def cmd_setup_check(args):
         "missing": missing,
         "warnings": warnings,
         "config": config,
-        "voice_model": env("ELEVENLABS_MODEL_ID", "eleven_v3_conversational"),
+        "voice_model": env("ELEVENLABS_MODEL_ID", "eleven_v3"),
         "plugin_dir": str(_PLUGIN_DIR),
     })
 
@@ -159,7 +159,7 @@ def cmd_generate_audio(args):
         _output({"error": "Missing PUBLIC_BASE_URL. Run /setup first."})
         sys.exit(1)
 
-    model_id = env("ELEVENLABS_MODEL_ID", "eleven_v3_conversational")
+    model_id = env("ELEVENLABS_MODEL_ID", "eleven_v3")
     output_format = env("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")
     text_limit = int(env("ELEVENLABS_TEXT_LIMIT", "4500"))
 

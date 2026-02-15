@@ -27,7 +27,7 @@ def main() -> None:
 
     api_key = env("ELEVENLABS_API_KEY")
     voice_id = env("ELEVENLABS_VOICE_ID")
-    model_id = env("ELEVENLABS_MODEL_ID", "eleven_v3_conversational")
+    model_id = env("ELEVENLABS_MODEL_ID", "eleven_v3")
     output_format = env("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")
     text_limit = int(env("ELEVENLABS_TEXT_LIMIT", "4500"))
 
