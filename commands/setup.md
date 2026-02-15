@@ -27,6 +27,7 @@ Claude Desktop CoWorks runs inside an **Ubuntu 22.04 Linux VM** (not macOS).
 - Plugin cache is mounted **read-only**
 - `open` command does not exist — use `file://` links and show paths instead
 - No `sudo` access
+- **The VM filesystem is isolated from the host Mac.** Files created here do NOT appear on the user's machine. The VM is a temporary workspace — push to GitHub, then user clones on their host.
 - **The VM has NO SSH keys.** Git push uses HTTPS with a GitHub Personal Access Token stored in `.env`.
 - **Shell variables do NOT persist between Bash tool calls.** Each Bash call is a new shell. Always re-discover `PLUGIN_DIR` in each Bash call or combine dependent commands into a single call.
 
@@ -93,7 +94,9 @@ Store this as `GH_USER`.
 
 ### Step 3: Podcast repo setup
 
-The user needs a git repo for their podcast data. This is NOT the plugin repo.
+The user needs a GitHub repo for their podcast data. This is NOT the plugin repo.
+
+**IMPORTANT: The VM filesystem is isolated from the host Mac.** Files created in the VM do NOT appear on the user's machine. The VM is a temporary workspace — the persistent copy lives on GitHub. At the end of setup, we push everything to GitHub and give the user clone instructions for their host machine.
 
 Ask: "Do you have a GitHub repository set up for this podcast? If so, what's the repo name on GitHub?"
 
@@ -114,7 +117,7 @@ Tell the user:
 
 Just get the repo name (e.g., `my-podcast`).
 
-**In both cases**, clone via HTTPS (works without auth for public repos) and set up the local structure:
+**In both cases**, clone into the VM's working directory and scaffold:
 
 ```bash
 PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
@@ -133,8 +136,10 @@ echo '<html><body><p>Podcast coming soon.</p></body></html>' > output/public/ind
 git add .
 git commit -m "Initial setup: GitHub Pages deploy workflow"
 
-echo "Repo ready at: $HOME/<repo-name>"
+echo "Repo ready at: $HOME/<repo-name> (VM working copy)"
 ```
+
+**Note:** `$HOME/<repo-name>` is inside the VM. It will be pushed to GitHub in Step 7. The user clones on their host machine after that.
 
 Check for existing episodes (for existing repos):
 ```bash
@@ -247,7 +252,7 @@ Available commands:
 
 ## Git Push
 
-The VM pushes via HTTPS using the `GITHUB_TOKEN` from `.env`. The push command temporarily sets the token in the remote URL, pushes, then resets it. Never persist the token in `.git/config`.
+The VM filesystem is isolated — files do NOT appear on the user's Mac. All work is pushed to GitHub via HTTPS using `GITHUB_TOKEN` from `.env`. The push command temporarily sets the token in the remote URL, pushes, then resets it. Never persist the token in `.git/config`. After pushing, the user pulls on their host machine.
 
 ## Podcast Configuration
 
@@ -336,12 +341,26 @@ git remote set-url origin "https://github.com/${GH_USER}/${REPO_NAME}.git"
 echo "Pushed successfully!"
 ```
 
-After push succeeds:
+After push succeeds, tell the user to clone on their host machine:
 
-> Setup complete! Your podcast is now live at:
+> Setup complete! Everything has been pushed to GitHub.
+>
+> **To get the repo on your machine**, run this in your terminal:
+> ```
+> cd <wherever you want it>
+> git clone git@github.com:<GH_USER>/<repo-name>.git
+> ```
+>
+> Then create a `.env` file in that folder with the same secrets you just set up. You can copy it from this session:
+> ```
+> cat ~/podcast-1/.env
+> ```
+> (I'll show you the contents — just copy them into `<your-folder>/<repo-name>/.env` on your Mac.)
+>
+> **Your podcast will be live at:**
 > **https://<GH_USER>.github.io/<repo-name>/**
 >
-> GitHub Pages will auto-enable when the workflow runs for the first time (may take 1-2 minutes).
+> GitHub Pages auto-enables when the workflow runs (may take 1-2 minutes after the first push).
 >
 > Run `/podcast-episode <url>` to create your first episode!
 
