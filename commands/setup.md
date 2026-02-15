@@ -55,7 +55,38 @@ Test:
 uv run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
 ```
 
-### Step 2: Podcast repo setup (do this BEFORE secrets)
+### Step 2: Git identity and authentication check
+
+Before creating or using any repo, verify who the user is and that git works:
+
+```bash
+# Show git identity
+echo "Git user: $(git config --global user.name) <$(git config --global user.email)>"
+```
+
+Present this to the user: "I'll be using this git identity: **<name> \<<email>\>**. Is that correct?"
+
+If git user/email is not set, ask for their name and email, then set it:
+```bash
+git config --global user.name "<name>"
+git config --global user.email "<email>"
+```
+
+Check if `gh` CLI is available and authenticated:
+```bash
+which gh 2>/dev/null && gh auth status 2>&1
+```
+
+If `gh` is available but not authenticated, run `gh auth login` now — before proceeding.
+
+If `gh` is not available, verify git can reach GitHub:
+```bash
+git ls-remote https://github.com/octocat/Hello-World.git HEAD 2>&1 | head -1
+```
+
+If auth fails, help fix it before continuing. **Do not proceed to repo creation with broken auth.**
+
+### Step 3: Podcast repo setup (do this BEFORE secrets)
 
 The user needs a git repo for their podcast data (episodes, feed, audio files). The `.env` config file will also live here. This is NOT the plugin repo.
 
@@ -69,17 +100,11 @@ First, ask the user for:
 
 Then run everything via Bash — do NOT tell the user to open a terminal.
 
-First, check if `gh` CLI is available:
-```bash
-which gh 2>/dev/null && echo "gh available" || echo "gh not found"
-```
+Use `gh` or plain `git` based on what was detected in Step 2.
 
-**If `gh` is available:**
+**If `gh` is available (from Step 2):**
 
 ```bash
-# Verify gh is authenticated (if not, run: gh auth login)
-gh auth status
-
 # Create the repo directory locally
 mkdir -p <parent-dir>/<repo-name>
 cd <parent-dir>/<repo-name>
@@ -145,7 +170,7 @@ Tell the user: "Go to your repo Settings > Pages > Source: GitHub Actions to ena
 uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
 ```
 
-### Step 3: Create .env in the podcast repo
+### Step 4: Create .env in the podcast repo
 
 Copy the example `.env` to the podcast repo:
 ```bash
@@ -159,7 +184,7 @@ echo ".env" >> "<podcast-repo>/.gitignore"
 
 Tell the user: "I've created a `.env` file in your podcast repo. You'll need to open it in a text editor to fill in your API keys. Let me tell you which values to set."
 
-### Step 4: Required secrets (user edits .env themselves)
+### Step 5: Required secrets (user edits .env themselves)
 
 For secrets, do NOT collect values. Instead, give the user clear instructions:
 
@@ -177,7 +202,7 @@ After the user confirms they've set both values, re-run `setup_check` to verify:
 uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
 ```
 
-### Step 5: Voice model selection
+### Step 6: Voice model selection
 
 Ask the user which ElevenLabs model they want to use:
 - **eleven_v3** (default) — Latest v3 model with enhanced quality
@@ -186,7 +211,7 @@ Ask the user which ElevenLabs model they want to use:
 
 If they pick something other than the default, tell them to update `ELEVENLABS_MODEL_ID` in `<podcast-repo>/.env`.
 
-### Step 6: Non-secret configuration
+### Step 7: Non-secret configuration
 
 These values are safe to collect in the chat. For each value the user provides, tell them to add it to `<podcast-repo>/.env`:
 
@@ -201,17 +226,6 @@ These values are safe to collect in the chat. For each value the user provides, 
 **PODCAST_LINK**: URL to your Substack or website
 **PODCAST_EMAIL**: Contact email for podcast directories
 **PODCAST_IMAGE_URL**: URL to a square cover image (1400x1400 to 3000x3000 pixels)
-
-### Step 7: Git auth check
-
-Verify git can push from this machine:
-```bash
-git -C "<podcast-repo>" push --dry-run origin main 2>&1
-```
-
-If it fails:
-- If `gh` is available: `gh auth status 2>&1 || gh auth login`
-- If `gh` is not available: check git credential helpers with `git config --global credential.helper` and guide the user through setting up credentials
 
 ### Step 8: Validate
 
