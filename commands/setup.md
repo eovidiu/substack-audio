@@ -22,19 +22,41 @@ Guide the user through configuring this plugin so they can generate podcast epis
 
 All plugin commands run via Bash. The plugin directory is the parent of the `substack_audio/` package.
 
+**IMPORTANT:** The Claude Desktop sandbox may not have `uv` in PATH. Always locate it first and use the full path.
+
 ```bash
+# Find uv (check common locations)
+UV="$(command -v uv 2>/dev/null || echo /opt/homebrew/bin/uv)"
+[ -x "$UV" ] || UV="$HOME/.local/bin/uv"
+[ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
+
 # Find the plugin directory (where pyproject.toml lives)
 PLUGIN_DIR="$(dirname "$(find ~ -path "*/substack-audio/pyproject.toml" -maxdepth 6 2>/dev/null | head -1)")"
 
 # Run any CLI command
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
+"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
 ```
 
 ## Workflow
 
-### Step 1: Find plugin directory and install dependencies
+### Step 1: Find uv, plugin directory, and install dependencies
 
-Locate the plugin and ensure dependencies are installed:
+First, locate `uv` — the sandbox PATH may not include it:
+
+```bash
+UV="$(command -v uv 2>/dev/null || echo /opt/homebrew/bin/uv)"
+[ -x "$UV" ] || UV="$HOME/.local/bin/uv"
+[ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
+[ -x "$UV" ] && echo "Found uv: $UV" || echo "ERROR: uv not found"
+```
+
+If `uv` is not found at all, install it:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+UV="$HOME/.local/bin/uv"
+```
+
+Locate the plugin:
 
 ```bash
 PLUGIN_DIR="$(dirname "$(find ~ -path "*/substack-audio/pyproject.toml" -maxdepth 6 2>/dev/null | head -1)")"
@@ -48,12 +70,12 @@ ls ~/Library/Application\ Support/Claude/plugins/*/substack-audio/pyproject.toml
 
 Install dependencies:
 ```bash
-uv sync --directory "$PLUGIN_DIR"
+"$UV" sync --directory "$PLUGIN_DIR"
 ```
 
 Test:
 ```bash
-uv run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
+"$UV" run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
 ```
 
 ### Step 2: Git identity and authentication check
@@ -175,7 +197,7 @@ Tell the user: "Go to your repo Settings > Pages > Source: GitHub Actions to ena
 
 **In both cases**, save the podcast repo path:
 ```bash
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
+"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
 ```
 
 ### Step 4: Collect podcast details and build .env
@@ -256,7 +278,7 @@ Then tell the user, including the full file path and a clickable link:
 After the user confirms they've set the secrets, run `setup_check`:
 
 ```bash
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
+"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
 ```
 
 If `ready` is true:
