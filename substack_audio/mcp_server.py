@@ -15,8 +15,9 @@ from substack_audio.parse import strip_html_to_text
 from substack_audio.tts import concat_mp3, elevenlabs_tts, split_text
 from substack_audio.util import load_json, parse_pub_date, save_json, slugify
 
-# Load .env as fallback — plugin config in .mcp.json env block takes precedence.
-load_dotenv()
+# Secrets (API keys) live in .env (gitignored). Non-secret defaults live in .mcp.json.
+# override=True lets .env values win over empty placeholders set by .mcp.json env block.
+load_dotenv(override=True)
 
 mcp = FastMCP("Substack Audio")
 
