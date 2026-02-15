@@ -1,39 +1,32 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
   <channel>
-    <title>Human.Augmented.</title>
+    <title>Ovidiu Eftimie - Audio Articles</title>
     <link>https://eovidiu.github.io/substack-audio/feed.xml</link>
-    <description>Hosted by Ovidiu Eftimie, this show explores...</description>
+    <description>Spoken versions of my Substack articles.</description>
     <atom:link href="https://eovidiu.github.io/substack-audio/feed.xml" rel="self"/>
     <docs>http://www.rssboard.org/rss-specification</docs>
     <generator>python-feedgen</generator>
     <language>en</language>
-    <lastBuildDate>Sun, 15 Feb 2026 10:08:58 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 15 Feb 2026 11:09:21 +0000</lastBuildDate>
     <itunes:author>Ovidiu Eftimie</itunes:author>
     <itunes:explicit>no</itunes:explicit>
-    <itunes:summary>Hosted by Ovidiu Eftimie, this show explores...</itunes:summary>
+    <itunes:summary>Spoken versions of my Substack articles.</itunes:summary>
     <itunes:type>episodic</itunes:type>
     <item>
-      <title>Building a code review Skill taught me about consistency, token budgets, and the hidden cost of automation</title>
-      <link>https://ovidiueftimie.substack.com/p/building-a-code-review-skill-taught</link>
-      <description>When your AI gets so good you forget it's everywhere: my first Claude Skills experiment</description>
-      <guid isPermaLink="false">https://ovidiueftimie.substack.com/p/building-a-code-review-skill-taught</guid>
-      <enclosure url="https://eovidiu.github.io/substack-audio/audio/2025-10-26-building-a-code-review-skill-taught-me-about-consistency-token-budgets-and-the-h.mp3" length="18748436" type="audio/mpeg"/>
-      <pubDate>Sun, 26 Oct 2025 16:30:23 +0000</pubDate>
+      <title>The myth behind fears of a developer-less future</title>
+      <link>https://ovidiueftimie.substack.com/p/the-myth-behind-fears-of-a-developer</link>
+      <description>What if the most confident prediction about AI and software developers has the economics exactly backwards?
+
+In 1865, a British economist named William Stanley Jevons watched engineers build better steam engines. Each new design used less coal per...</description>
+      <guid isPermaLink="false">https://ovidiueftimie.substack.com/p/the-myth-behind-fears-of-a-developer</guid>
+      <enclosure url="https://eovidiu.github.io/substack-audio/audio/2026-02-01-the-myth-behind-fears-of-a-developer-less-future.mp3" length="8467896" type="audio/mpeg"/>
+      <pubDate>Sun, 01 Feb 2026 00:00:00 +0000</pubDate>
       <itunes:author>Ovidiu Eftimie</itunes:author>
       <itunes:explicit>no</itunes:explicit>
-      <itunes:summary>When your AI gets so good you forget it's everywhere: my first Claude Skills experiment</itunes:summary>
-    </item>
-    <item>
-      <title>Introducing E-shaped people</title>
-      <link>https://ovidiueftimie.substack.com/p/introducing-e-shaped-people</link>
-      <description>What happens when the walls between disciplines don't just get thinner, but disappear entirely?  Think about DevOps for a moment. Before it existed, developers wrote code and threw it over the wall to operations. Operations kept the lights on. Two se</description>
-      <guid isPermaLink="false">https://ovidiueftimie.substack.com/p/introducing-e-shaped-people</guid>
-      <enclosure url="https://eovidiu.github.io/substack-audio/audio/2026-02-09-introducing-e-shaped-people.mp3" length="5404673" type="audio/mpeg"/>
-      <pubDate>Mon, 09 Feb 2026 00:00:00 +0000</pubDate>
-      <itunes:author>Ovidiu Eftimie</itunes:author>
-      <itunes:explicit>no</itunes:explicit>
-      <itunes:summary>What happens when the walls between disciplines don't just get thinner, but disappear entirely?  Think about DevOps for a moment. Before it existed, developers wrote code and threw it over the wall to operations. Operations kept the lights on. Two se</itunes:summary>
+      <itunes:summary>What if the most confident prediction about AI and software developers has the economics exactly backwards?
+
+In 1865, a British economist named William Stanley Jevons watched engineers build better steam engines. Each new design used less coal per...</itunes:summary>
     </item>
   </channel>
 </rss>

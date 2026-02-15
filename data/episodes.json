@@ -1,24 +1,13 @@
 [
   {
-    "guid": "https://ovidiueftimie.substack.com/p/building-a-code-review-skill-taught",
-    "title": "Building a code review Skill taught me about consistency, token budgets, and the hidden cost of automation",
-    "description": "When your AI gets so good you forget it's everywhere: my first Claude Skills experiment",
+    "guid": "https://ovidiueftimie.substack.com/p/the-myth-behind-fears-of-a-developer",
+    "title": "The myth behind fears of a developer-less future",
+    "description": "What if the most confident prediction about AI and software developers has the economics exactly backwards?\n\nIn 1865, a British economist named William Stanley Jevons watched engineers build better steam engines. Each new design used less coal per...",
     "author": "Ovidiu Eftimie",
-    "link": "https://ovidiueftimie.substack.com/p/building-a-code-review-skill-taught",
-    "pub_date_iso": "2025-10-26T16:30:23+00:00",
-    "audio_file": "2025-10-26-building-a-code-review-skill-taught-me-about-consistency-token-budgets-and-the-h.mp3",
-    "audio_url": "https://eovidiu.github.io/substack-audio/audio/2025-10-26-building-a-code-review-skill-taught-me-about-consistency-token-budgets-and-the-h.mp3",
-    "audio_size_bytes": 18748436
-  },
-  {
-    "guid": "https://ovidiueftimie.substack.com/p/introducing-e-shaped-people",
-    "title": "Introducing E-shaped people",
-    "description": "What happens when the walls between disciplines don't just get thinner, but disappear entirely?  Think about DevOps for a moment. Before it existed, developers wrote code and threw it over the wall to operations. Operations kept the lights on. Two se",
-    "author": "Ovidiu Eftimie",
-    "link": "https://ovidiueftimie.substack.com/p/introducing-e-shaped-people",
-    "pub_date_iso": "2026-02-09T00:00:00+00:00",
-    "audio_file": "2026-02-09-introducing-e-shaped-people.mp3",
-    "audio_url": "https://eovidiu.github.io/substack-audio/audio/2026-02-09-introducing-e-shaped-people.mp3",
-    "audio_size_bytes": 5404673
+    "link": "https://ovidiueftimie.substack.com/p/the-myth-behind-fears-of-a-developer",
+    "pub_date_iso": "2026-02-01T00:00:00+00:00",
+    "audio_file": "2026-02-01-the-myth-behind-fears-of-a-developer-less-future.mp3",
+    "audio_url": "https://eovidiu.github.io/substack-audio/audio/2026-02-01-the-myth-behind-fears-of-a-developer-less-future.mp3",
+    "audio_size_bytes": 8467896
   }
 ]
