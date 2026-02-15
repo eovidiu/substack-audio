@@ -17,6 +17,12 @@ allowed-tools:
 
 Create a podcast episode from: $ARGUMENTS
 
+## Critical Rules
+
+- **NEVER delete or reorder existing episodes** in episodes.json or feed.xml. Append only.
+- **NEVER ask the user to paste API keys** into this chat. Secrets go in Connector env vars.
+- **NEVER ask the user to leave Claude Desktop** to run terminal commands. Everything happens here.
+
 ## Workflow
 
 ### Step 0: Pre-flight check
@@ -78,15 +84,33 @@ cp <plugin-cache>/data/state.json <target>/data/
 
 The source paths come from the `generate_audio` and `update_feed` tool responses.
 
-### Step 8: Ask about git
-Ask: "Ready to commit and push the new episode to GitHub? This will update the feed on GitHub Pages."
+### Step 8: Git commit and push
 
-If confirmed, run from the target project folder:
+First, verify git is available and authenticated:
+```bash
+git -C <target> remote -v
+git -C <target> push --dry-run origin main 2>&1
+```
+
+If the dry-run fails (authentication issue), help the user fix it:
+- Check if `gh` CLI is available: `which gh && gh auth status`
+- If `gh` is available but not logged in, run: `gh auth login`
+- If `gh` is not available, check git credential helpers: `git -C <target> config credential.helper`
+- Guide the user through fixing auth **without leaving Claude Desktop**
+
+Once auth is confirmed, ask: "Ready to commit and push the new episode to GitHub? This will update the feed on GitHub Pages."
+
+If confirmed:
 ```bash
 cd <target>
 git add data/episodes.json data/state.json output/public/feed.xml output/public/audio/
 git commit -m "Add episode: <title>"
 git push origin main
+```
+
+After push, verify success:
+```bash
+git -C <target> log --oneline -1
 ```
 
 ### Step 9: Cleanup

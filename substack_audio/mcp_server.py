@@ -137,23 +137,23 @@ def setup_check() -> dict:
         if v["value"]
     }
 
+    # Current model setting
+    current_model = env("ELEVENLABS_MODEL_ID", "eleven_v3_conversational")
+
     result = {
         "ready": ready,
         "missing": missing,
         "warnings": warnings,
         "config": config,
+        "voice_model": current_model,
     }
 
     if not ready:
         result["setup_instructions"] = (
-            "Create a .env file in your working directory with the missing values. "
-            "Example:\n\n"
-            "ELEVENLABS_API_KEY=your_key_here\n"
-            "ELEVENLABS_VOICE_ID=your_voice_id\n"
-            "PUBLIC_BASE_URL=https://yourname.github.io/substack-audio\n\n"
-            "Then update the connector in Claude Desktop to point --directory "
-            "to your working directory, and add PROJECT_ROOT as an env var "
-            "pointing to the same path."
+            "Set the missing values in your Connector environment variables "
+            "(Claude Desktop > Plugins > Substack audio > Connectors > Edit). "
+            "For API keys and secrets, NEVER paste them into the chat — "
+            "always set them in the Connector settings directly."
         )
 
     return result
