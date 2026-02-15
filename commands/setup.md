@@ -17,7 +17,7 @@ Guide the user through configuring this plugin so they can generate podcast epis
 - **NEVER clone or pull the plugin's code repo.** The plugin ships as a zip — all code is already here.
 - **The plugin directory is READ-ONLY.** Never write files there. All user data (including `.env`) lives in the **podcast repo**.
 - **Automate everything possible.** Run commands via Bash.
-- **NEVER show VM-internal paths to the user** (e.g. `/sessions/abc-xyz/...`). Always show paths relative to the user-chosen folder. The VM may map user folders to internal paths — those are invisible to the user.
+- **NEVER show VM-internal paths to the user** (e.g. `/sessions/abc-xyz/...`). The VM mounts the user's working folder at an internal path — that path is meaningless to the user. Always show paths **relative to the podcast repo folder** (e.g. `podcast-1/.env`, `podcast-1/CLAUDE.md`). The user knows where their CoWorks working folder is on their Mac.
 
 ## Sandbox Environment
 
@@ -96,12 +96,7 @@ Store this as `GH_USER`.
 
 The user needs a GitHub repo for their podcast data. This is NOT the plugin repo.
 
-**Ask two things:**
-
-1. "Do you have a GitHub repository set up for this podcast? If so, what's the repo name on GitHub?"
-2. "Where on your Mac do you want the podcast folder? Give me the full path (e.g. `/Users/you/work/my-podcast`)."
-
-Store the user's chosen path as `PODCAST_DIR`.
+Ask: "Do you have a GitHub repository set up for this podcast? If so, what's the repo name on GitHub?"
 
 **If no repo — create one:**
 
@@ -120,16 +115,13 @@ Tell the user:
 
 Just get the repo name (e.g., `my-podcast`).
 
-**In both cases**, clone into the user-chosen folder and scaffold:
+**In both cases**, clone into the CoWorks working folder and scaffold:
 
 ```bash
 PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
 
-# Clone into user-chosen location (parent must exist)
-PODCAST_DIR="<user-chosen-path>"
-mkdir -p "$(dirname "$PODCAST_DIR")"
-git clone https://github.com/<GH_USER>/<repo-name>.git "$PODCAST_DIR"
-cd "$PODCAST_DIR"
+git clone https://github.com/<GH_USER>/<repo-name>.git
+cd <repo-name>
 
 mkdir -p data output/public/audio .github/workflows
 
@@ -141,10 +133,11 @@ echo '<html><body><p>Podcast coming soon.</p></body></html>' > output/public/ind
 git add .
 git commit -m "Initial setup: GitHub Pages deploy workflow"
 
-echo "Repo ready at: $PODCAST_DIR"
+PODCAST_DIR="$(pwd)"
+echo "Repo ready: <repo-name>/"
 ```
 
-**The scaffolded folder is on the user's Mac.** They can open it in Finder, edit `.env` there, etc.
+`PODCAST_DIR` is the full VM path for use in subsequent Bash commands. **When showing paths to the user, always use relative paths** like `<repo-name>/.env`, never the absolute VM path.
 
 Check for existing episodes (for existing repos):
 ```bash
@@ -287,13 +280,11 @@ git commit -m "Add CLAUDE.md with project context"
 
 ### Step 6: Set API secrets
 
-**IMPORTANT: When showing file paths to the user, use the path THEY provided in Step 3 (their Mac path), NOT the VM's internal path.** The VM may map the user's folder to an internal path like `/sessions/abc-xyz/...` — never show that to the user. Always refer to the folder by the name/path the user gave you.
-
 Tell the user:
 
 > I've created your `.env` file with all the podcast settings pre-filled. There are **three values** you need to set manually (I can't handle API keys in this chat).
 >
-> **Open the `.env` file in your podcast folder on your Mac** (the folder you specified: `<the path the user gave you>`). You can open it with any text editor.
+> **Open `<repo-name>/.env`** in your CoWorks working folder on your Mac. You can open it with any text editor.
 >
 > 1. Replace `your_key_here` with your ElevenLabs API key
 >    - Get it at [elevenlabs.io](https://elevenlabs.io) > Profile > API Keys
@@ -349,7 +340,7 @@ echo "Pushed successfully!"
 
 After push succeeds:
 
-> Setup complete! Your podcast repo is at **<PODCAST_DIR>** and has been pushed to GitHub.
+> Setup complete! Your podcast repo (`<repo-name>/` in your working folder) has been pushed to GitHub.
 >
 > **Your podcast will be live at:**
 > **https://<GH_USER>.github.io/<repo-name>/**
