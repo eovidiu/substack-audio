@@ -10,6 +10,7 @@ allowed-tools:
   - mcp__substack-audio__generate_audio
   - mcp__substack-audio__update_feed
   - mcp__substack-audio__list_episodes
+  - mcp__substack-audio__cleanup
 ---
 
 # Podcast Episode Creator
@@ -72,3 +73,6 @@ git add data/episodes.json data/state.json output/public/feed.xml output/public/
 git commit -m "Add episode: <title>"
 git push origin main
 ```
+
+### Step 8: Cleanup
+After a successful git push, call the `cleanup` tool to remove any leftover temporary audio chunks (`.part*.mp3` files) from the output directory.

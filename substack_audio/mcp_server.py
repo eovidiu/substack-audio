@@ -232,10 +232,15 @@ def generate_audio(text: str, title: str, pub_date: str = "") -> dict:
     final_audio = output_dir / f"{base_name}.mp3"
     concat_mp3(part_files, final_audio)
 
-    # Clean up part files
+    # Clean up part files — both from this run and any orphaned from previous runs
     for part in part_files:
         try:
             part.unlink()
+        except OSError:
+            pass
+    for orphan in output_dir.glob("*.part*.mp3"):
+        try:
+            orphan.unlink()
         except OSError:
             pass
 
@@ -331,6 +336,27 @@ def update_feed(
         "episodes_count": len(episodes),
         "feed_path": str(_output_feed_file()),
         "state_path": str(state_file),
+    }
+
+
+@mcp.tool()
+def cleanup() -> dict:
+    """Remove orphaned temporary audio files (.part*.mp3) from the output directory.
+
+    Call this after episode generation and git push to ensure no leftover
+    chunks remain. Returns the list of files that were removed.
+    """
+    output_dir = _output_audio_dir()
+    removed = []
+    for orphan in output_dir.glob("*.part*.mp3"):
+        try:
+            orphan.unlink()
+            removed.append(orphan.name)
+        except OSError as e:
+            removed.append(f"{orphan.name} (failed: {e})")
+    return {
+        "removed": removed,
+        "removed_count": len(removed),
     }
 
 
