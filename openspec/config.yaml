@@ -1,0 +1,41 @@
+schema: spec-driven
+
+context: |
+  # Substack Audio Plugin
+
+  Claude Desktop CoWorks plugin that converts Substack articles into podcast episodes.
+
+  ## Architecture
+  Two-repo: plugin code (read-only zip in Claude Desktop cache) + podcast repo (user's GitHub repo with episodes, feed, audio).
+
+  ## Execution Environment
+  Ubuntu 22.04 VM (CoWorks). Plugin cache mounted read-only. User working folder mounted read-write. No SSH keys. Push via HTTPS + GitHub fine-grained token.
+
+  ## Tech Stack
+  - Python 3, pip (no uv at runtime)
+  - beautifulsoup4, cloudscraper, requests (fetching)
+  - elevenlabs SDK (TTS)
+  - feedgen (RSS generation)
+  - python-dotenv (config)
+  - ffmpeg (MP3 concat, optional -- byte-append fallback)
+  - GitHub Actions (Pages deployment)
+
+  ## Primary Workflows
+  1. `/setup` -- First-run configuration (commands/setup.md)
+  2. `/podcast-episode <url>` -- End-to-end episode creation (commands/podcast-episode.md)
+
+  ## Conventions
+  - All CLI commands output JSON to stdout
+  - CLI invoked via: PYTHONPATH="$PLUGIN_DIR" python3 -m substack_audio.cli <command>
+  - Secrets in .env (podcast repo), never in chat, never in git
+  - Episodes are append-only; existing feed entries are never deleted or reordered
+  - Git push uses temporary token in remote URL, immediately reset after push
+  - VM-internal paths (/sessions/...) are never shown to the user
+
+rules:
+  specs:
+    - Use WHEN/THEN/AND scenario format
+    - Each requirement gets a unique descriptive name
+    - Requirements use SHALL for mandatory behavior
+    - Scenarios cover both happy path and error/edge cases
+    - Reference actual function names and file paths where relevant
