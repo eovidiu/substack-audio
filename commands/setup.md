@@ -15,7 +15,7 @@ Guide the user through configuring this plugin so they can generate podcast epis
 
 - **NEVER ask the user to paste API keys or secrets into this chat.** Direct them to edit their `.env` file in a text editor.
 - **NEVER clone or pull the plugin's code repo.** The plugin ships as a zip — all code is already here.
-- The plugin code (this directory) is READ-ONLY. User data lives in their **podcast repo**.
+- **The plugin directory is READ-ONLY.** Never write files there. All user data (including `.env`) lives in the **podcast repo**.
 
 ## How Commands Work
 
@@ -55,69 +55,11 @@ Test:
 uv run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
 ```
 
-### Step 2: Check current state
+### Step 2: Podcast repo setup (do this BEFORE secrets)
 
-```bash
-uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
-```
+The user needs a git repo for their podcast data (episodes, feed, audio files). The `.env` config file will also live here. This is NOT the plugin repo.
 
-Parse the JSON output. If `ready` is true and `warnings` is empty:
-"You're all set! Run `/podcast-episode <url>` to create an episode."
-
-If `ready` is true but there are warnings, show the recommended settings. Ask if they want to set them now or skip.
-
-If `ready` is false, proceed to Step 3.
-
-### Step 3: Required secrets (user sets these outside the chat)
-
-For secrets, do NOT collect values. Instead, give the user clear instructions:
-
-**ELEVENLABS_API_KEY**:
-> Go to [elevenlabs.io](https://elevenlabs.io) > Profile (bottom-left) > API Keys > Copy your key.
-> Open the `.env` file in the plugin directory (`$PLUGIN_DIR/.env`) in a text editor and set `ELEVENLABS_API_KEY=your-key-here`.
-
-**ELEVENLABS_VOICE_ID**:
-> In ElevenLabs, go to Voices, pick a voice, and copy the Voice ID from the URL or settings panel.
-> Suggestions: "Rachel" (warm, professional female) or "Adam" (deep male).
-> Set `ELEVENLABS_VOICE_ID=your-voice-id` in the same `.env` file.
-
-If the `.env` file doesn't exist yet, create it from the example:
-```bash
-cp "$PLUGIN_DIR/.env.example" "$PLUGIN_DIR/.env"
-```
-
-After the user confirms they've set both values, re-run `setup_check` to verify.
-
-### Step 4: Voice model selection
-
-Ask the user which ElevenLabs model they want to use:
-- **eleven_v3_conversational** (default) — Latest v3 model with enhanced quality
-- **eleven_multilingual_v2** — Proven multilingual model, good for non-English content
-- **eleven_flash_v2_5** — Faster generation, slightly lower quality
-
-If they pick something other than the default, tell them to update `ELEVENLABS_MODEL_ID` in their `.env` file.
-
-### Step 5: Non-secret configuration
-
-These values are safe to collect in the chat. Ask the user for each, then tell them to add to `.env`:
-
-**PUBLIC_BASE_URL**:
-- This is where podcast files will be hosted
-- Easiest option: GitHub Pages
-- The URL will be `https://<username>.github.io/<repo-name>`
-
-**PODCAST_TITLE**: Name of the podcast (shows in Spotify, Apple Podcasts, etc.)
-**PODCAST_AUTHOR**: Your name or pen name
-**PODCAST_DESCRIPTION**: A sentence or two describing the podcast
-**PODCAST_LINK**: URL to your Substack or website
-**PODCAST_EMAIL**: Contact email for podcast directories
-**PODCAST_IMAGE_URL**: URL to a square cover image (1400x1400 to 3000x3000 pixels)
-
-### Step 6: Podcast repo setup
-
-The user needs a separate git repo for their podcast data (episodes, feed, audio files). This is NOT the plugin repo.
-
-Ask: "Do you have a GitHub repository set up for this podcast?"
+Ask: "Do you have a GitHub repository set up for this podcast? If so, what's the local path?"
 
 **If no — create one:**
 ```bash
@@ -149,16 +91,73 @@ git push origin main
   ```
 - If found, say: "I found existing episodes. These will be preserved — new episodes are always appended."
 
-Save the podcast repo path so future commands know where to write:
+Save the podcast repo path so future commands know where to find data and `.env`:
 ```bash
 uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
 ```
+
+### Step 3: Create .env in the podcast repo
+
+Copy the example `.env` to the podcast repo:
+```bash
+cp "$PLUGIN_DIR/.env.example" "<podcast-repo>/.env"
+```
+
+Add `.env` to the podcast repo's `.gitignore` (secrets must never be committed):
+```bash
+echo ".env" >> "<podcast-repo>/.gitignore"
+```
+
+Tell the user: "I've created a `.env` file in your podcast repo. You'll need to open it in a text editor to fill in your API keys. Let me tell you which values to set."
+
+### Step 4: Required secrets (user edits .env themselves)
+
+For secrets, do NOT collect values. Instead, give the user clear instructions:
+
+**ELEVENLABS_API_KEY**:
+> Go to [elevenlabs.io](https://elevenlabs.io) > Profile (bottom-left) > API Keys > Copy your key.
+> Open `<podcast-repo>/.env` in a text editor and set `ELEVENLABS_API_KEY=your-key-here`.
+
+**ELEVENLABS_VOICE_ID**:
+> In ElevenLabs, go to Voices, pick a voice, and copy the Voice ID from the URL or settings panel.
+> Suggestions: "Rachel" (warm, professional female) or "Adam" (deep male).
+> Set `ELEVENLABS_VOICE_ID=your-voice-id` in the same `.env` file.
+
+After the user confirms they've set both values, re-run `setup_check` to verify:
+```bash
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
+```
+
+### Step 5: Voice model selection
+
+Ask the user which ElevenLabs model they want to use:
+- **eleven_v3_conversational** (default) — Latest v3 model with enhanced quality
+- **eleven_multilingual_v2** — Proven multilingual model, good for non-English content
+- **eleven_flash_v2_5** — Faster generation, slightly lower quality
+
+If they pick something other than the default, tell them to update `ELEVENLABS_MODEL_ID` in `<podcast-repo>/.env`.
+
+### Step 6: Non-secret configuration
+
+These values are safe to collect in the chat. For each value the user provides, tell them to add it to `<podcast-repo>/.env`:
+
+**PUBLIC_BASE_URL**:
+- This is where podcast files will be hosted
+- Easiest option: GitHub Pages
+- The URL will be `https://<username>.github.io/<repo-name>`
+
+**PODCAST_TITLE**: Name of the podcast (shows in Spotify, Apple Podcasts, etc.)
+**PODCAST_AUTHOR**: Your name or pen name
+**PODCAST_DESCRIPTION**: A sentence or two describing the podcast
+**PODCAST_LINK**: URL to your Substack or website
+**PODCAST_EMAIL**: Contact email for podcast directories
+**PODCAST_IMAGE_URL**: URL to a square cover image (1400x1400 to 3000x3000 pixels)
 
 ### Step 7: Git auth check
 
 Verify git can push from this machine:
 ```bash
-git -C <podcast-repo> push --dry-run origin main 2>&1
+git -C "<podcast-repo>" push --dry-run origin main 2>&1
 ```
 
 If it fails, help the user fix auth:

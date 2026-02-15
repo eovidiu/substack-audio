@@ -51,8 +51,9 @@ Violating this rule breaks podcast subscribers' feeds and can cause episodes to 
 
 **NEVER ask the user to type API keys, tokens, or passwords into the chat.**
 
-- Direct users to set secrets in a `.env` file they edit themselves in a text editor.
+- Direct users to set secrets in the `.env` file **in their podcast repo** (not the plugin directory, which is read-only).
 - If a secret is missing, explain where to set it — do not prompt for the value.
+- The CLI loads `.env` from the podcast repo path stored in `data/config.json`.
 
 ## Git Operations
 

@@ -20,11 +20,22 @@ from substack_audio.fetch import fetch_article_by_url
 from substack_audio.tts import concat_mp3, elevenlabs_tts, split_text
 from substack_audio.util import load_json, parse_pub_date, save_json, slugify
 
-# Load .env if present (from plugin cache or podcast repo).
-load_dotenv(override=True)
-
 # Plugin directory = parent of substack_audio/ package.
 _PLUGIN_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env from multiple locations (first found wins, later overrides earlier):
+# 1. Plugin directory (shipped defaults in .env.example, or local dev .env)
+# 2. Podcast repo (user's secrets — this is the primary location)
+load_dotenv(_PLUGIN_DIR / ".env", override=True)
+
+# Check config for podcast repo path and load its .env too
+_config_path = _PLUGIN_DIR / "data" / "config.json"
+if _config_path.exists():
+    import json as _json
+    _cfg = _json.loads(_config_path.read_text())
+    _podcast_env = Path(_cfg.get("podcast_repo_path", "")) / ".env"
+    if _podcast_env.exists():
+        load_dotenv(_podcast_env, override=True)
 
 # Project root: where data/ and output/ live.
 # Defaults to plugin dir, but CLI commands can override with --project-root.
