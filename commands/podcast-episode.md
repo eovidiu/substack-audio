@@ -17,8 +17,7 @@ Create a podcast episode from: $ARGUMENTS
 - **NEVER delete or reorder existing episodes** in episodes.json or feed.xml. Append only.
 - **NEVER ask the user to paste API keys** into this chat. Secrets live in `.env`.
 - **NEVER clone or pull the plugin's code repo.** All code is already here in the plugin cache.
-- The plugin code directory is READ-ONLY. User data lives in their **podcast repo**.
-- **The VM filesystem is isolated from the host Mac.** After generating an episode, push to GitHub so the user can pull on their machine.
+- The plugin code directory is READ-ONLY. User data lives in their **podcast repo** (on the user's Mac).
 
 ## How Commands Work
 
