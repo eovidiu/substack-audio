@@ -61,28 +61,52 @@ The user needs a git repo for their podcast data (episodes, feed, audio files). 
 
 Ask: "Do you have a GitHub repository set up for this podcast? If so, what's the local path?"
 
-**If no — create one:**
+**If no — create one automatically via Bash:**
+
+First, ask the user for:
+- A repo name (e.g., `my-podcast`)
+- Where to create it locally (e.g., `~/work` — the repo will be `~/work/my-podcast`)
+
+Then run everything via Bash — do NOT tell the user to open a terminal:
+
 ```bash
-gh repo create <repo-name> --public --clone
-cd <repo-name>
+# Verify gh is authenticated
+gh auth status
+
+# Create the repo directory locally
+mkdir -p <parent-dir>/<repo-name>
+cd <parent-dir>/<repo-name>
+git init
+
+# Create required directories
 mkdir -p data output/public/audio .github/workflows
-```
 
-Copy the GitHub Pages workflow from the plugin:
-```bash
+# Copy GitHub Pages workflow from plugin
 cp "$PLUGIN_DIR/.github/workflows/podcast.yml" .github/workflows/
-```
 
-Enable GitHub Pages: tell the user to go to repo Settings > Pages > Source: GitHub Actions.
-
-Initial commit:
-```bash
+# Initial commit
 git add .github/workflows/podcast.yml
 git commit -m "Add GitHub Pages deploy workflow"
-git push origin main
+
+# Create GitHub repo and push
+gh repo create <repo-name> --public --source=. --push
 ```
 
-**If yes:**
+After the repo is created, enable GitHub Pages via the API:
+```bash
+# Get the GitHub username
+GH_USER=$(gh api user --jq '.login')
+
+# Enable GitHub Pages with GitHub Actions as the build source
+gh api "repos/$GH_USER/<repo-name>/pages" -X POST -f "build_type=workflow" 2>/dev/null || echo "Pages may already be enabled or needs manual setup at: https://github.com/$GH_USER/<repo-name>/settings/pages"
+```
+
+If `gh auth status` fails, authenticate first:
+```bash
+gh auth login
+```
+
+**If yes — use existing repo:**
 - Ask for the local path to the repo
 - Check for existing episodes:
   ```bash
@@ -91,7 +115,7 @@ git push origin main
   ```
 - If found, say: "I found existing episodes. These will be preserved — new episodes are always appended."
 
-Save the podcast repo path so future commands know where to find data and `.env`:
+**In both cases**, save the podcast repo path:
 ```bash
 uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
 ```
@@ -160,12 +184,10 @@ Verify git can push from this machine:
 git -C "<podcast-repo>" push --dry-run origin main 2>&1
 ```
 
-If it fails, help the user fix auth:
+If it fails, fix auth automatically via Bash:
 ```bash
-which gh && gh auth status
+gh auth status 2>&1 || gh auth login
 ```
-
-If `gh` is available but not logged in: `gh auth login`
 
 ### Step 8: Validate
 
