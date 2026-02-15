@@ -58,6 +58,106 @@ def _feed_cfg() -> dict:
 
 
 @mcp.tool()
+def setup_check() -> dict:
+    """Check plugin configuration and return what's ready, what's missing, and what needs attention.
+
+    Call this before generating episodes to verify all required settings are in place.
+    If anything is missing, the response includes setup instructions for each value.
+    """
+    required = {
+        "ELEVENLABS_API_KEY": {
+            "value": env("ELEVENLABS_API_KEY"),
+            "label": "ElevenLabs API key",
+            "help": "Sign up at elevenlabs.io, go to Profile > API Keys, and copy your key.",
+        },
+        "ELEVENLABS_VOICE_ID": {
+            "value": env("ELEVENLABS_VOICE_ID"),
+            "label": "ElevenLabs Voice ID",
+            "help": "In ElevenLabs, go to Voices, pick a voice, and copy the Voice ID from the URL or settings.",
+        },
+        "PUBLIC_BASE_URL": {
+            "value": env("PUBLIC_BASE_URL"),
+            "label": "Public base URL for audio files",
+            "help": "The URL where your podcast files will be hosted (e.g. https://yourname.github.io/substack-audio). Set up GitHub Pages: repo Settings > Pages > Source: GitHub Actions.",
+        },
+    }
+
+    recommended = {
+        "PODCAST_TITLE": {
+            "value": env("PODCAST_TITLE"),
+            "label": "Podcast title",
+            "help": "The name of your podcast as it appears in Spotify/Apple Podcasts.",
+        },
+        "PODCAST_AUTHOR": {
+            "value": env("PODCAST_AUTHOR"),
+            "label": "Podcast author name",
+            "help": "Your name or pen name.",
+        },
+        "PODCAST_DESCRIPTION": {
+            "value": env("PODCAST_DESCRIPTION"),
+            "label": "Podcast description",
+            "help": "A short description of your podcast for directories.",
+        },
+        "PODCAST_LINK": {
+            "value": env("PODCAST_LINK"),
+            "label": "Podcast website link",
+            "help": "URL to your Substack or podcast website.",
+        },
+        "PODCAST_EMAIL": {
+            "value": env("PODCAST_EMAIL"),
+            "label": "Contact email",
+            "help": "Email shown in podcast directories.",
+        },
+        "PODCAST_IMAGE_URL": {
+            "value": env("PODCAST_IMAGE_URL"),
+            "label": "Podcast cover image URL",
+            "help": "URL to a square image (1400x1400 min, 3000x3000 max) for podcast directories.",
+        },
+    }
+
+    missing = [
+        {"env_var": k, "label": v["label"], "help": v["help"]}
+        for k, v in required.items()
+        if not v["value"]
+    ]
+    warnings = [
+        {"env_var": k, "label": v["label"], "help": v["help"]}
+        for k, v in recommended.items()
+        if not v["value"]
+    ]
+
+    ready = len(missing) == 0
+
+    config = {
+        k: "***" if "KEY" in k else v["value"]
+        for section in (required, recommended)
+        for k, v in section.items()
+        if v["value"]
+    }
+
+    result = {
+        "ready": ready,
+        "missing": missing,
+        "warnings": warnings,
+        "config": config,
+    }
+
+    if not ready:
+        result["setup_instructions"] = (
+            "Create a .env file in your working directory with the missing values. "
+            "Example:\n\n"
+            "ELEVENLABS_API_KEY=your_key_here\n"
+            "ELEVENLABS_VOICE_ID=your_voice_id\n"
+            "PUBLIC_BASE_URL=https://yourname.github.io/substack-audio\n\n"
+            "Then update the connector in Claude Desktop to point --directory "
+            "to your working directory, and add PROJECT_ROOT as an env var "
+            "pointing to the same path."
+        )
+
+    return result
+
+
+@mcp.tool()
 def fetch_article(url: str) -> dict:
     """Fetch a Substack article by URL and return its text content with metadata.
 
@@ -82,7 +182,10 @@ def generate_audio(text: str, title: str, pub_date: str = "") -> dict:
     api_key = env("ELEVENLABS_API_KEY")
     voice_id = env("ELEVENLABS_VOICE_ID")
     if not api_key or not voice_id:
-        return {"error": "Missing ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID"}
+        return {
+            "error": "Missing ELEVENLABS_API_KEY or ELEVENLABS_VOICE_ID. "
+            "Run the setup_check tool or /setup command to see what's needed."
+        }
 
     model_id = env("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
     output_format = env("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")
@@ -90,7 +193,10 @@ def generate_audio(text: str, title: str, pub_date: str = "") -> dict:
     public_base_url = env("PUBLIC_BASE_URL")
 
     if not public_base_url:
-        return {"error": "Missing PUBLIC_BASE_URL"}
+        return {
+            "error": "Missing PUBLIC_BASE_URL. "
+            "Run the setup_check tool or /setup command to see what's needed."
+        }
 
     client = ElevenLabs(api_key=api_key)
     output_dir = _output_audio_dir()

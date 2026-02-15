@@ -5,6 +5,7 @@ allowed-tools:
   - Read
   - Bash
   - Glob
+  - mcp__substack-audio__setup_check
   - mcp__substack-audio__fetch_article
   - mcp__substack-audio__generate_audio
   - mcp__substack-audio__update_feed
@@ -16,6 +17,11 @@ allowed-tools:
 Create a podcast episode from: $ARGUMENTS
 
 ## Workflow
+
+### Step 0: Pre-flight check
+Call the `setup_check` MCP tool. If `ready` is false, show the user what's missing with the setup instructions and **stop** — do not proceed until the configuration is complete. Suggest running `/setup` for a guided walkthrough.
+
+If `warnings` is non-empty, mention the recommended settings but continue.
 
 ### Step 1: Fetch the article
 Use the `fetch_article` MCP tool with the provided URL. Display the article title, author, word count.
