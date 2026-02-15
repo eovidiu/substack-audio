@@ -230,17 +230,24 @@ grep -qxF '.env' "<podcast-repo>/.gitignore" 2>/dev/null || echo ".env" >> "<pod
 
 ### Step 5: Set API secrets (only manual step)
 
-Tell the user:
+First, try to open the `.env` file directly in the user's default editor:
+```bash
+open "<podcast-repo>/.env"
+```
 
-> I've created your `.env` file with all the podcast settings pre-filled. There are just **two values** you need to set manually (I can't handle API keys in this chat):
+Then tell the user, including the full file path and a clickable link:
+
+> I've created your `.env` file with all the podcast settings pre-filled. There are just **two values** you need to set manually (I can't handle API keys in this chat).
 >
-> 1. Open `<podcast-repo>/.env` in a text editor
-> 2. Replace `your_key_here` with your ElevenLabs API key
+> **File location:** `<podcast-repo>/.env`
+> **Click to open:** [Open .env file](file://<podcast-repo>/.env)
+>
+> 1. Replace `your_key_here` with your ElevenLabs API key
 >    - Get it at [elevenlabs.io](https://elevenlabs.io) > Profile > API Keys
-> 3. Replace `your_voice_id_here` with your ElevenLabs Voice ID
+> 2. Replace `your_voice_id_here` with your ElevenLabs Voice ID
 >    - In ElevenLabs > Voices > pick a voice > copy the Voice ID
 >    - Suggestions: "Rachel" (warm female) or "Adam" (deep male)
-> 4. Save the file
+> 3. Save the file
 >
 > Let me know when you're done and I'll verify everything works.
 
