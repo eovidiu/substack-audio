@@ -67,10 +67,17 @@ First, ask the user for:
 - A repo name (e.g., `my-podcast`)
 - Where to create it locally (e.g., `~/work` — the repo will be `~/work/my-podcast`)
 
-Then run everything via Bash — do NOT tell the user to open a terminal:
+Then run everything via Bash — do NOT tell the user to open a terminal.
+
+First, check if `gh` CLI is available:
+```bash
+which gh 2>/dev/null && echo "gh available" || echo "gh not found"
+```
+
+**If `gh` is available:**
 
 ```bash
-# Verify gh is authenticated
+# Verify gh is authenticated (if not, run: gh auth login)
 gh auth status
 
 # Create the repo directory locally
@@ -90,21 +97,39 @@ git commit -m "Add GitHub Pages deploy workflow"
 
 # Create GitHub repo and push
 gh repo create <repo-name> --public --source=. --push
-```
-
-After the repo is created, enable GitHub Pages via the API:
-```bash
-# Get the GitHub username
-GH_USER=$(gh api user --jq '.login')
 
 # Enable GitHub Pages with GitHub Actions as the build source
-gh api "repos/$GH_USER/<repo-name>/pages" -X POST -f "build_type=workflow" 2>/dev/null || echo "Pages may already be enabled or needs manual setup at: https://github.com/$GH_USER/<repo-name>/settings/pages"
+GH_USER=$(gh api user --jq '.login')
+gh api "repos/$GH_USER/<repo-name>/pages" -X POST -f "build_type=workflow" 2>/dev/null || echo "Pages may need manual setup at: https://github.com/$GH_USER/<repo-name>/settings/pages"
 ```
 
-If `gh auth status` fails, authenticate first:
+**If `gh` is NOT available — use plain git:**
+
+Ask the user for their GitHub username, then:
 ```bash
-gh auth login
+# Create the repo directory locally
+mkdir -p <parent-dir>/<repo-name>
+cd <parent-dir>/<repo-name>
+git init
+
+# Create required directories
+mkdir -p data output/public/audio .github/workflows
+
+# Copy GitHub Pages workflow from plugin
+cp "$PLUGIN_DIR/.github/workflows/podcast.yml" .github/workflows/
+
+# Initial commit
+git add .github/workflows/podcast.yml
+git commit -m "Add GitHub Pages deploy workflow"
 ```
+
+Then ask the user to create the repo on GitHub (https://github.com/new) and provide the repo URL. Once they do:
+```bash
+git remote add origin https://github.com/<username>/<repo-name>.git
+git push -u origin main
+```
+
+Tell the user: "Go to your repo Settings > Pages > Source: GitHub Actions to enable GitHub Pages."
 
 **If yes — use existing repo:**
 - Ask for the local path to the repo
@@ -184,10 +209,9 @@ Verify git can push from this machine:
 git -C "<podcast-repo>" push --dry-run origin main 2>&1
 ```
 
-If it fails, fix auth automatically via Bash:
-```bash
-gh auth status 2>&1 || gh auth login
-```
+If it fails:
+- If `gh` is available: `gh auth status 2>&1 || gh auth login`
+- If `gh` is not available: check git credential helpers with `git config --global credential.helper` and guide the user through setting up credentials
 
 ### Step 8: Validate
 
