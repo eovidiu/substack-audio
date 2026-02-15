@@ -17,6 +17,7 @@ Guide the user through configuring this plugin so they can generate podcast epis
 - **NEVER clone or pull the plugin's code repo.** The plugin ships as a zip — all code is already here.
 - **The plugin directory is READ-ONLY.** Never write files there. All user data (including `.env`) lives in the **podcast repo**.
 - **Automate everything possible.** Run commands via Bash.
+- **NEVER show VM-internal paths to the user** (e.g. `/sessions/abc-xyz/...`). Always refer to the podcast folder by the path the user provided. The VM may map user folders to internal paths — those are invisible to the user.
 
 ## Sandbox Environment
 
@@ -286,12 +287,13 @@ git commit -m "Add CLAUDE.md with project context"
 
 ### Step 6: Set API secrets
 
+**IMPORTANT: When showing file paths to the user, use the path THEY provided in Step 3 (their Mac path), NOT the VM's internal path.** The VM may map the user's folder to an internal path like `/sessions/abc-xyz/...` — never show that to the user. Always refer to the folder by the name/path the user gave you.
+
 Tell the user:
 
 > I've created your `.env` file with all the podcast settings pre-filled. There are **three values** you need to set manually (I can't handle API keys in this chat).
 >
-> **File location:** `<PODCAST_DIR>/.env`
-> **Click to open:** [Open .env file](file://<PODCAST_DIR>/.env)
+> **Open the `.env` file in your podcast folder on your Mac** (the folder you specified: `<the path the user gave you>`). You can open it with any text editor.
 >
 > 1. Replace `your_key_here` with your ElevenLabs API key
 >    - Get it at [elevenlabs.io](https://elevenlabs.io) > Profile > API Keys
