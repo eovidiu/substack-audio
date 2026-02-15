@@ -1,405 +1,25 @@
 #!/usr/bin/env python3
-import email.utils
-import json
-import os
-import re
-import subprocess
-import tempfile
-import time
-from datetime import datetime, timezone
+"""CLI entrypoint: batch-process Substack RSS feed into podcast episodes."""
+
 from pathlib import Path
 from typing import Dict, List
-import xml.etree.ElementTree as ET
 
 import requests
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from feedgen.feed import FeedGenerator
-try:
-    import cloudscraper  # type: ignore
-except Exception:  # pragma: no cover
-    cloudscraper = None
 
-
-def env(name: str, default: str = "") -> str:
-    value = os.getenv(name, default)
-    if value is None or value == "":
-        return default
-    return value
-
-
-def ensure_parent(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-
-def load_json(path: Path, default):
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    return default
-
-
-def save_json(path: Path, data) -> None:
-    ensure_parent(path)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
-def slugify(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\s-]", "", text)
-    text = re.sub(r"[\s-]+", "-", text)
-    return text[:80].strip("-") or "untitled"
-
-
-def strip_html_to_text(html: str) -> str:
-    soup = BeautifulSoup(html or "", "html.parser")
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-    text = soup.get_text("\n")
-    lines = [ln.strip() for ln in text.splitlines()]
-    lines = [ln for ln in lines if ln]
-    return "\n\n".join(lines)
-
-
-def split_text(text: str, max_len: int) -> List[str]:
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    chunks: List[str] = []
-    cur = ""
-
-    for para in paragraphs:
-        candidate = f"{cur}\n\n{para}".strip() if cur else para
-        if len(candidate) <= max_len:
-            cur = candidate
-            continue
-
-        if cur:
-            chunks.append(cur)
-            cur = ""
-
-        while len(para) > max_len:
-            cut = para.rfind(" ", 0, max_len)
-            if cut == -1:
-                cut = max_len
-            chunks.append(para[:cut].strip())
-            para = para[cut:].strip()
-
-        cur = para
-
-    if cur:
-        chunks.append(cur)
-
-    return chunks
-
-
-def parse_rss(feed_xml: str) -> List[Dict]:
-    ns = {
-        "content": "http://purl.org/rss/1.0/modules/content/",
-        "dc": "http://purl.org/dc/elements/1.1/",
-    }
-
-    root = ET.fromstring(feed_xml)
-    channel = root.find("channel")
-    if channel is None:
-        return []
-
-    items = []
-    for item in channel.findall("item"):
-        title = (item.findtext("title") or "Untitled").strip()
-        link = (item.findtext("link") or "").strip()
-        guid = (item.findtext("guid") or link or title).strip()
-        pub_date = (item.findtext("pubDate") or "").strip()
-        description = item.findtext("description") or ""
-        content_encoded = item.findtext("content:encoded", namespaces=ns) or description
-        author = item.findtext("dc:creator", namespaces=ns) or ""
-
-        items.append(
-            {
-                "title": title,
-                "link": link,
-                "guid": guid,
-                "pub_date": pub_date,
-                "description_html": description,
-                "content_html": content_encoded,
-                "author": author.strip(),
-            }
-        )
-
-    return items
-
-
-def parse_archive_json(archive_json: str) -> List[Dict]:
-    rows = json.loads(archive_json)
-    items: List[Dict] = []
-    for row in rows:
-        title = (row.get("title") or "Untitled").strip()
-        link = (row.get("canonical_url") or "").strip()
-        guid = str(row.get("id") or link or title).strip()
-        pub_date = (row.get("post_date") or "").strip()
-        description = (row.get("description") or row.get("subtitle") or "").strip()
-        content_html = row.get("body_html") or row.get("truncated_body_text") or description
-
-        author = ""
-        bylines = row.get("publishedBylines") or []
-        if bylines and isinstance(bylines, list):
-            first = bylines[0] or {}
-            author = (first.get("name") or "").strip()
-
-        items.append(
-            {
-                "title": title,
-                "link": link,
-                "guid": guid,
-                "pub_date": pub_date,
-                "description_html": description,
-                "content_html": content_html,
-                "author": author,
-            }
-        )
-    return items
-
-
-def parse_posts_json(posts_json: str) -> List[Dict]:
-    rows = json.loads(posts_json)
-    items: List[Dict] = []
-    for row in rows:
-        title = (row.get("title") or "Untitled").strip()
-        link = (row.get("canonical_url") or "").strip()
-        guid = str(row.get("id") or link or title).strip()
-        pub_date = (row.get("post_date") or "").strip()
-        description = (row.get("description") or row.get("subtitle") or "").strip()
-        content_html = row.get("body_html") or row.get("truncated_body_text") or description
-
-        author = ""
-        bylines = row.get("publishedBylines") or []
-        if bylines and isinstance(bylines, list):
-            first = bylines[0] or {}
-            author = (first.get("name") or "").strip()
-
-        items.append(
-            {
-                "title": title,
-                "link": link,
-                "guid": guid,
-                "pub_date": pub_date,
-                "description_html": description,
-                "content_html": content_html,
-                "author": author,
-            }
-        )
-    return items
-
-
-def parse_pub_date(pub_date: str) -> datetime:
-    try:
-        dt = email.utils.parsedate_to_datetime(pub_date)
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-    except Exception:
-        return datetime.now(timezone.utc)
-
-
-def fetch_feed_xml(feed_url: str, timeout: int = 30) -> str:
-    # Substack may return 403 to generic bot fingerprints; emulate an RSS reader/browser.
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.1",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Referer": feed_url.rsplit("/", 1)[0],
-    }
-
-    session = requests.Session()
-    last_exc = None
-
-    # CI-friendly first try: curl often passes Cloudflare checks where requests fails.
-    try:
-        curl_cmd = [
-            "curl",
-            "-fsSL",
-            "--max-time",
-            str(timeout),
-            "-A",
-            headers["User-Agent"],
-            "-H",
-            f"Accept: {headers['Accept']}",
-            "-H",
-            f"Accept-Language: {headers['Accept-Language']}",
-            "-H",
-            f"Referer: {headers['Referer']}",
-            feed_url,
-        ]
-        curl_resp = subprocess.run(curl_cmd, check=True, capture_output=True, text=True)
-        if curl_resp.stdout.strip():
-            return curl_resp.stdout
-    except Exception as exc:
-        last_exc = exc
-
-    for attempt in range(1, 4):
-        try:
-            resp = session.get(feed_url, headers=headers, timeout=timeout)
-            resp.raise_for_status()
-            return resp.text
-        except requests.HTTPError as exc:
-            last_exc = exc
-            code = exc.response.status_code if exc.response is not None else None
-            if code in (403, 429, 500, 502, 503, 504) and attempt < 3:
-                time.sleep(attempt * 2)
-                continue
-            break
-        except requests.RequestException as exc:
-            last_exc = exc
-            if attempt < 3:
-                time.sleep(attempt * 2)
-                continue
-            break
-
-    # Last resort for Cloudflare-protected endpoints on CI runner IP ranges.
-    if cloudscraper is not None:
-        scraper = cloudscraper.create_scraper(
-            browser={"browser": "chrome", "platform": "darwin", "mobile": False}
-        )
-        resp = scraper.get(feed_url, headers=headers, timeout=timeout)
-        resp.raise_for_status()
-        return resp.text
-
-    raise RuntimeError(f"Failed to fetch feed: {feed_url}") from last_exc
-
-
-def fetch_archive_json(feed_url: str, timeout: int = 30) -> str:
-    # Convert /feed URL to archive API endpoint.
-    base = feed_url.rsplit("/feed", 1)[0] if "/feed" in feed_url else feed_url.rstrip("/")
-    archive_url = f"{base}/api/v1/archive?sort=new"
-    return fetch_feed_xml(archive_url, timeout=timeout)
-
-
-def fetch_posts_json(feed_url: str, max_posts: int, timeout: int = 30) -> str:
-    base = feed_url.rsplit("/feed", 1)[0] if "/feed" in feed_url else feed_url.rstrip("/")
-    posts_url = f"{base}/api/v1/posts?limit={max(10, max_posts * 3)}"
-    return fetch_feed_xml(posts_url, timeout=timeout)
-
-
-def elevenlabs_tts(
-    client: ElevenLabs,
-    voice_id: str,
-    model_id: str,
-    output_format: str,
-    text: str,
-) -> bytes:
-    audio = client.text_to_speech.convert(
-        text=text,
-        voice_id=voice_id,
-        model_id=model_id,
-        output_format=output_format,
-    )
-    if isinstance(audio, (bytes, bytearray)):
-        return bytes(audio)
-    return b"".join(chunk for chunk in audio if isinstance(chunk, (bytes, bytearray)))
-
-
-def concat_mp3(parts: List[Path], output_file: Path) -> None:
-    if len(parts) == 1:
-        output_file.write_bytes(parts[0].read_bytes())
-        return
-
-    ffmpeg_available = False
-    try:
-        subprocess.run(["ffmpeg", "-version"], check=False, capture_output=True)
-        ffmpeg_available = True
-    except FileNotFoundError:
-        ffmpeg_available = False
-
-    if ffmpeg_available:
-        with tempfile.NamedTemporaryFile("w", delete=False) as list_file:
-            for part in parts:
-                list_file.write(f"file '{part.resolve()}'\n")
-            list_path = list_file.name
-
-        try:
-            subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-f",
-                    "concat",
-                    "-safe",
-                    "0",
-                    "-i",
-                    list_path,
-                    "-c",
-                    "copy",
-                    str(output_file),
-                ],
-                check=True,
-                capture_output=True,
-            )
-            return
-        finally:
-            try:
-                os.unlink(list_path)
-            except OSError:
-                pass
-
-    with output_file.open("wb") as out:
-        for part in parts:
-            out.write(part.read_bytes())
-
-
-def build_audio_url(public_base_url: str, file_name: str) -> str:
-    return f"{public_base_url.rstrip('/')}/audio/{file_name}"
-
-
-def build_feed(episodes: List[Dict], output_feed: Path, cfg: Dict) -> None:
-    fg = FeedGenerator()
-    fg.load_extension("podcast")
-
-    fg.title(cfg["title"])
-    fg.description(cfg["description"])
-    if cfg["site_link"]:
-        fg.link(href=cfg["site_link"], rel="alternate")
-    fg.link(href=cfg["feed_url"], rel="self")
-    fg.language(cfg["language"])
-    fg.author({"name": cfg["author"], "email": cfg["email"]})
-
-    fg.podcast.itunes_author(cfg["author"])
-    fg.podcast.itunes_summary(cfg["description"])
-    fg.podcast.itunes_type("episodic")
-    fg.podcast.itunes_explicit("no")
-
-    if cfg["image_url"]:
-        fg.image(cfg["image_url"])
-        fg.podcast.itunes_image(cfg["image_url"])
-
-    sorted_eps = sorted(
-        episodes,
-        key=lambda e: e.get("pub_date_iso", ""),
-        reverse=True,
-    )
-
-    for ep in sorted_eps:
-        fe = fg.add_entry()
-        fe.id(ep["guid"])
-        fe.title(ep["title"])
-        fe.link(href=ep["link"]) if ep.get("link") else None
-        fe.description(ep["description"])
-        fe.enclosure(ep["audio_url"], str(ep["audio_size_bytes"]), "audio/mpeg")
-
-        pub_dt = datetime.fromisoformat(ep["pub_date_iso"])
-        fe.pubDate(pub_dt)
-
-        fe.podcast.itunes_author(ep.get("author") or cfg["author"])
-        fe.podcast.itunes_summary(ep["description"])
-        fe.podcast.itunes_explicit("no")
-
-    ensure_parent(output_feed)
-    fg.rss_file(str(output_feed), pretty=True)
+from substack_audio.config import env, env_bool, parse_csv
+from substack_audio.feed import build_audio_url, build_feed
+from substack_audio.fetch import fetch_archive_json, fetch_feed_xml, fetch_posts_json
+from substack_audio.parse import (
+    parse_archive_json,
+    parse_posts_json,
+    parse_rss,
+    select_items,
+    strip_html_to_text,
+)
+from substack_audio.tts import concat_mp3, elevenlabs_tts, split_text
+from substack_audio.util import load_json, parse_pub_date, save_json, slugify
 
 
 def main() -> None:
@@ -413,6 +33,8 @@ def main() -> None:
 
     feed_url = env("SUBSTACK_FEED_URL", "https://ovidiueftimie.substack.com/feed")
     max_posts = int(env("MAX_POSTS_PER_RUN", "3"))
+    target_articles = parse_csv(env("TARGET_ARTICLES", ""))
+    target_include_processed = env_bool("TARGET_INCLUDE_PROCESSED", True)
 
     public_base_url = env("PUBLIC_BASE_URL")
     state_file = Path(env("STATE_FILE", "data/state.json"))
@@ -452,11 +74,19 @@ def main() -> None:
 
     if not items:
         print("No items found in RSS feed.")
-    new_items = [it for it in items if it["guid"] not in processed_guids]
-    new_items = sorted(new_items, key=lambda x: parse_pub_date(x["pub_date"]))[:max_posts]
+    if target_articles:
+        print(f"Cherry-pick mode enabled with {len(target_articles)} selector(s).")
+        new_items = select_items(items, target_articles)
+        if not target_include_processed:
+            new_items = [it for it in new_items if it["guid"] not in processed_guids]
+        new_items = sorted(new_items, key=lambda x: parse_pub_date(x["pub_date"]))
+        print(f"Matched {len(new_items)} article(s) for processing.")
+    else:
+        new_items = [it for it in items if it["guid"] not in processed_guids]
+        new_items = sorted(new_items, key=lambda x: parse_pub_date(x["pub_date"]))[:max_posts]
 
     if not new_items:
-        print("No new posts to process.")
+        print("No posts to process.")
 
     for item in new_items:
         title = item["title"]

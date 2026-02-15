@@ -1,0 +1,21 @@
+{
+  "substack-audio": {
+    "command": "uv",
+    "args": ["run", "--directory", ".", "python", "-m", "substack_audio.mcp_server"],
+    "env": {
+      "ELEVENLABS_API_KEY": "",
+      "ELEVENLABS_VOICE_ID": "",
+      "PUBLIC_BASE_URL": "https://eovidiu.github.io/substack-audio",
+      "ELEVENLABS_MODEL_ID": "eleven_multilingual_v2",
+      "ELEVENLABS_OUTPUT_FORMAT": "mp3_44100_128",
+      "ELEVENLABS_TEXT_LIMIT": "4500",
+      "PODCAST_TITLE": "Ovidiu Eftimie - Audio Articles",
+      "PODCAST_DESCRIPTION": "Spoken versions of my Substack articles.",
+      "PODCAST_AUTHOR": "Ovidiu Eftimie",
+      "PODCAST_LINK": "https://ovidiueftimie.substack.com",
+      "PODCAST_EMAIL": "",
+      "PODCAST_LANGUAGE": "en",
+      "PODCAST_IMAGE_URL": ""
+    }
+  }
+}

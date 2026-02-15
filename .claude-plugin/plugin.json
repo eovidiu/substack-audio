@@ -1,0 +1,7 @@
+{
+  "name": "substack-audio",
+  "description": "Convert Substack articles into podcast audio episodes with ElevenLabs TTS. Fetch articles, create audio narratives, generate MP3s, and manage podcast RSS feeds.",
+  "author": {
+    "name": "Ovidiu Eftimie"
+  }
+}

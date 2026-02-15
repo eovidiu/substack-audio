@@ -1,0 +1,14 @@
+[project]
+name = "substack-audio"
+version = "0.1.0"
+description = "Convert Substack articles into podcast audio episodes with ElevenLabs TTS"
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "cloudscraper>=1.2",
+    "elevenlabs",
+    "feedgen>=1.0",
+    "python-dotenv>=1.0",
+    "requests>=2.32",
+    "fastmcp>=2.0",
+]
