@@ -145,8 +145,11 @@ mkdir -p data output/public/audio .github/workflows
 
 cp "$PLUGIN_DIR/.github/workflows/podcast.yml" .github/workflows/
 
-git add .github/workflows/podcast.yml
-git commit -m "Add GitHub Pages deploy workflow"
+# Placeholder so the Pages deploy workflow triggers on first push
+echo '<html><body><p>Podcast coming soon.</p></body></html>' > output/public/index.html
+
+git add .github/workflows/podcast.yml output/public/index.html
+git commit -m "Initial setup: GitHub Pages deploy workflow"
 
 git remote add origin git@github.com:<GH_USER>/<repo-name>.git
 git branch -M main
@@ -159,12 +162,10 @@ git remote set-url origin https://github.com/<GH_USER>/<repo-name>.git
 git push -u origin main
 ```
 
-After successful push, tell the user:
+The push triggers the GitHub Actions workflow, which auto-enables GitHub Pages via `actions/configure-pages`. No manual settings needed.
 
-> Repo is live! One more thing — enable GitHub Pages so your podcast feed is published:
-> https://github.com/<GH_USER>/<repo-name>/settings/pages
->
-> Under **Source**, select **GitHub Actions**. That's it.
+Verify the workflow started:
+> Check https://github.com/<GH_USER>/<repo-name>/actions to confirm the deploy workflow is running. Your podcast will be live at https://<GH_USER>.github.io/<repo-name>/ once it completes.
 
 **If yes — use existing repo:**
 - Ask for the local path to the repo
