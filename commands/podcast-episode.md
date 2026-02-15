@@ -21,56 +21,50 @@ Create a podcast episode from: $ARGUMENTS
 
 ## How Commands Work
 
-All commands run via Bash using the CLI.
-
-**IMPORTANT:** The Claude Desktop sandbox may not have `uv` in PATH. Always locate it first and use the full path.
+All commands run via Bash using `uv` and the CLI. The sandbox (Ubuntu 22.04 VM) may not have `uv` in PATH — ensure it's available first.
 
 ```bash
-# Find uv
-UV="$(command -v uv 2>/dev/null || echo /opt/homebrew/bin/uv)"
-[ -x "$UV" ] || UV="$HOME/.local/bin/uv"
-[ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
+export PATH="$HOME/.local/bin:$PATH"
 
 # Find plugin directory
-PLUGIN_DIR="$(dirname "$(find ~ -path "*/substack-audio/pyproject.toml" -maxdepth 6 2>/dev/null | head -1)")"
+PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
 
 # Run any CLI command
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
 ```
 
-Store `UV` and `PLUGIN_DIR` at the start and reuse them throughout.
+Store `PLUGIN_DIR` at the start and reuse it throughout.
 
 ## Workflow
 
 ### Step 0: Pre-flight check
 
-Find `uv`, the plugin directory, and run setup check:
+Ensure `uv` is on PATH, find the plugin directory, and run setup check:
 
 ```bash
-UV="$(command -v uv 2>/dev/null || echo /opt/homebrew/bin/uv)"
-[ -x "$UV" ] || UV="$HOME/.local/bin/uv"
-[ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv 2>/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh; }
 
-PLUGIN_DIR="$(dirname "$(find ~ -path "*/substack-audio/pyproject.toml" -maxdepth 6 2>/dev/null | head -1)")"
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
+PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
 ```
 
 If `ready` is false, show what's missing and **stop** — suggest running `/setup`.
 
 Get the podcast repo path from saved config:
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli get_config
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli get_config
 ```
 
 The `podcast_repo_path` field tells you where user data lives. If not set, ask the user for their podcast repo path and save it:
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<path>"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<path>"
 ```
 
 ### Step 1: Fetch the article
 
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli fetch_article "<url>"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli fetch_article "<url>"
 ```
 
 Parse the JSON output. Display the article title, author, word count.
@@ -78,7 +72,7 @@ Parse the JSON output. Display the article title, author, word count.
 ### Step 2: Check for duplicates
 
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli list_episodes --project-root "<podcast-repo>"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli list_episodes --project-root "<podcast-repo>"
 ```
 
 Check if this article URL appears as a `guid` in the episodes list. If it has, warn the user and ask whether to regenerate.
@@ -103,7 +97,7 @@ cat > /tmp/narrative.txt << 'NARRATIVE_EOF'
 <narrative text here>
 NARRATIVE_EOF
 
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli generate_audio \
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli generate_audio \
   --title "<article title>" \
   --pub-date "<pub date ISO>" \
   --text-file /tmp/narrative.txt \
@@ -115,7 +109,7 @@ This calls ElevenLabs and costs API credits. The tool returns JSON with `audio_f
 ### Step 5: Update the feed
 
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli update_feed \
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli update_feed \
   --title "<article title>" \
   --description "<first ~250 chars of narrative>" \
   --author "<article author>" \
@@ -168,6 +162,6 @@ git -C "<podcast-repo>" log --oneline -1
 After a successful git push, clean up temporary files:
 
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli cleanup --project-root "<podcast-repo>"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli cleanup --project-root "<podcast-repo>"
 rm -f /tmp/narrative.txt
 ```

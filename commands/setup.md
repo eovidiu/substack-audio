@@ -18,72 +18,90 @@ Guide the user through configuring this plugin so they can generate podcast epis
 - **The plugin directory is READ-ONLY.** Never write files there. All user data (including `.env`) lives in the **podcast repo**.
 - **Automate everything possible.** Run commands via Bash. Never tell the user to open a terminal.
 
+## Sandbox Environment
+
+Claude Desktop CoWorks runs inside an **Ubuntu 22.04 Linux VM** (not macOS).
+
+- `python3`, `git`, `curl`, `wget` are available
+- `uv`, `gh`, `brew` are NOT pre-installed — install them at setup time
+- User files are mounted under `/sessions/*/mnt/` or `$HOME`
+- Plugin cache is mounted **read-only**
+- `open` command does not exist — use `file://` links and show paths instead
+- No `sudo` access — install tools to `$HOME/.local/bin`
+
 ## How Commands Work
 
-All plugin commands run via Bash. The plugin directory is the parent of the `substack_audio/` package.
-
-**IMPORTANT:** The Claude Desktop sandbox may not have `uv` in PATH. Always locate it first and use the full path.
+All plugin commands run via Bash using `uv` and the CLI.
 
 ```bash
-# Find uv (check common locations)
-UV="$(command -v uv 2>/dev/null || echo /opt/homebrew/bin/uv)"
-[ -x "$UV" ] || UV="$HOME/.local/bin/uv"
-[ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
+# Ensure uv is installed and on PATH
+export PATH="$HOME/.local/bin:$PATH"
 
 # Find the plugin directory (where pyproject.toml lives)
-PLUGIN_DIR="$(dirname "$(find ~ -path "*/substack-audio/pyproject.toml" -maxdepth 6 2>/dev/null | head -1)")"
+PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
 
 # Run any CLI command
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli <command> [args]
 ```
 
 ## Workflow
 
-### Step 1: Find uv, plugin directory, and install dependencies
+### Step 1: Install tools and find plugin
 
-First, locate `uv` — the sandbox PATH may not include it:
+First, ensure `uv` is available:
 
 ```bash
-UV="$(command -v uv 2>/dev/null || echo /opt/homebrew/bin/uv)"
-[ -x "$UV" ] || UV="$HOME/.local/bin/uv"
-[ -x "$UV" ] || UV="$HOME/.cargo/bin/uv"
-[ -x "$UV" ] && echo "Found uv: $UV" || echo "ERROR: uv not found"
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv 2>/dev/null && echo "uv found: $(uv --version)" || echo "uv not found, installing..."
 ```
 
-If `uv` is not found at all, install it:
+If `uv` is not found, install it (works on Linux ARM64/x86_64):
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-UV="$HOME/.local/bin/uv"
+export PATH="$HOME/.local/bin:$PATH"
+uv --version
 ```
 
-Locate the plugin:
-
+Locate the plugin directory:
 ```bash
-PLUGIN_DIR="$(dirname "$(find ~ -path "*/substack-audio/pyproject.toml" -maxdepth 6 2>/dev/null | head -1)")"
+PLUGIN_DIR="$(find / -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1 | xargs dirname)"
 echo "Plugin directory: $PLUGIN_DIR"
 ```
 
-If not found, check common Claude Desktop plugin cache paths:
+If not found via `/`, also try:
 ```bash
-ls ~/Library/Application\ Support/Claude/plugins/*/substack-audio/pyproject.toml 2>/dev/null
+find "$HOME" /sessions /mnt -path "*/substack-audio/pyproject.toml" -maxdepth 8 2>/dev/null | head -1
 ```
 
-Install dependencies:
+Install dependencies (into a writable location — the venv goes in the default uv cache, not the read-only plugin dir):
 ```bash
-"$UV" sync --directory "$PLUGIN_DIR"
+uv sync --directory "$PLUGIN_DIR"
 ```
 
 Test:
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
+uv run --directory "$PLUGIN_DIR" python -c "import substack_audio; print('ok')"
+```
+
+Next, install `gh` CLI for GitHub operations:
+```bash
+command -v gh 2>/dev/null && echo "gh found" || {
+  GH_VERSION="2.67.0"
+  ARCH="$(uname -m)"
+  [ "$ARCH" = "aarch64" ] && ARCH="arm64"
+  [ "$ARCH" = "x86_64" ] && ARCH="amd64"
+  curl -LsSf "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${ARCH}.tar.gz" | tar xz -C /tmp
+  cp /tmp/gh_${GH_VERSION}_linux_${ARCH}/bin/gh "$HOME/.local/bin/gh"
+  chmod +x "$HOME/.local/bin/gh"
+  gh --version
+}
 ```
 
 ### Step 2: Git identity and authentication check
 
-Before creating or using any repo, verify who the user is and that git works:
+Verify who the user is and that git works:
 
 ```bash
-# Show git identity
 GIT_NAME="$(git config --global user.name)"
 GIT_EMAIL="$(git config --global user.email)"
 echo "Git user: $GIT_NAME <$GIT_EMAIL>"
@@ -99,38 +117,31 @@ git config --global user.email "<email>"
 
 **Store the git name and email — they will be used later to pre-fill `.env` values.**
 
-Check if `gh` CLI is available and authenticated:
+Authenticate `gh`:
 ```bash
-which gh 2>/dev/null && gh auth status 2>&1
+gh auth status 2>&1
 ```
 
-If `gh` is available, also grab the GitHub username for later:
+If not authenticated:
+```bash
+gh auth login
+```
+
+Grab the GitHub username:
 ```bash
 GH_USER=$(gh api user --jq '.login')
 echo "GitHub username: $GH_USER"
 ```
 
-If `gh` is available but not authenticated, run `gh auth login` now — before proceeding.
-
-If `gh` is not available, try to install it:
+If `gh auth login` fails (e.g. no browser available in sandbox), try token-based auth:
 ```bash
-# macOS
-brew install gh 2>/dev/null || echo "brew not available"
-# Or official installer
-command -v gh 2>/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null && echo "installed" || echo "could not install gh")
+echo "Please create a personal access token at https://github.com/settings/tokens/new"
+echo "Scopes needed: repo, read:org, workflow"
+echo "Then paste it when prompted:"
+gh auth login --with-token
 ```
 
-If `gh` was just installed, authenticate it:
-```bash
-gh auth login
-```
-
-If `gh` still cannot be installed, verify git can reach GitHub as a last resort:
-```bash
-git ls-remote https://github.com/octocat/Hello-World.git HEAD 2>&1 | head -1
-```
-
-If auth fails, help fix it before continuing. **Do not proceed to repo creation with broken auth.**
+**Do not proceed to repo creation with broken auth.**
 
 ### Step 3: Podcast repo setup
 
@@ -155,45 +166,30 @@ Then present a summary and **ask for confirmation before executing**:
 >
 > Ready to proceed?
 
-**Only after the user confirms**, execute everything via Bash. `gh` is required for this — it should have been installed and authenticated in Step 2.
+**Only after the user confirms**, execute via Bash:
 
 ```bash
-# Create the repo directory locally
 mkdir -p <parent-dir>/<repo-name>
 cd <parent-dir>/<repo-name>
 git init
 
-# Create required directories
 mkdir -p data output/public/audio .github/workflows
 
-# Copy GitHub Pages workflow from plugin
 cp "$PLUGIN_DIR/.github/workflows/podcast.yml" .github/workflows/
 
-# Initial commit
 git add .github/workflows/podcast.yml
 git commit -m "Add GitHub Pages deploy workflow"
 
-# Create GitHub repo and push
 gh repo create <repo-name> --public --source=. --push
 
-# Enable GitHub Pages with GitHub Actions as the build source
 gh api "repos/$GH_USER/<repo-name>/pages" -X POST -f "build_type=workflow" 2>/dev/null || echo "Pages may need manual setup at: https://github.com/$GH_USER/<repo-name>/settings/pages"
 ```
 
-Verify the push worked:
+Verify:
 ```bash
 git log --oneline -1
-gh repo view <GH_USER>/<repo-name> --json url --jq '.url'
+gh repo view $GH_USER/<repo-name> --json url --jq '.url'
 ```
-
-If `gh` is truly not available (install failed in Step 2), fall back to manual repo creation as a **last resort**:
-- Ask the user to create the repo at https://github.com/new
-- Then wire up the remote and push automatically:
-  ```bash
-  git remote add origin https://github.com/<username>/<repo-name>.git
-  git push -u origin main
-  ```
-- Tell the user: "Go to your repo Settings > Pages > Source: GitHub Actions to enable GitHub Pages."
 
 **If yes — use existing repo:**
 - Ask for the local path to the repo
@@ -206,7 +202,7 @@ If `gh` is truly not available (install failed in Step 2), fall back to manual r
 
 **In both cases**, save the podcast repo path:
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli save_config --podcast-repo-path "<podcast-repo-path>"
 ```
 
 ### Step 4: Collect podcast details and build .env
@@ -270,17 +266,25 @@ cat > "<podcast-repo>/CLAUDE.md" << 'CLAUDEEOF'
 ## Environment
 
 - **Plugin directory:** <PLUGIN_DIR>
-- **uv path:** <UV>
 - **Podcast repo:** <podcast-repo>
 - **GitHub username:** <GH_USER>
 - **Git identity:** <GIT_NAME> <<GIT_EMAIL>>
+
+## Setup (run once per session if tools are missing)
+
+```
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+command -v gh || echo "Install gh: see setup instructions"
+```
 
 ## CLI Commands
 
 All commands use the plugin's CLI via Bash:
 
 ```
-"<UV>" run --directory "<PLUGIN_DIR>" python -m substack_audio.cli <command> [args]
+export PATH="$HOME/.local/bin:$PATH"
+uv run --directory "<PLUGIN_DIR>" python -m substack_audio.cli <command> [args]
 ```
 
 Available commands:
@@ -318,12 +322,7 @@ This file is safe to commit — it contains no secrets (API keys stay in `.env`)
 
 ### Step 6: Set API secrets (only manual step)
 
-First, try to open the `.env` file directly in the user's default editor:
-```bash
-open "<podcast-repo>/.env"
-```
-
-Then tell the user, including the full file path and a clickable link:
+Tell the user, including the full file path and a clickable link:
 
 > I've created your `.env` file with all the podcast settings pre-filled. There are just **two values** you need to set manually (I can't handle API keys in this chat).
 >
@@ -344,7 +343,8 @@ Then tell the user, including the full file path and a clickable link:
 After the user confirms they've set the secrets, run `setup_check`:
 
 ```bash
-"$UV" run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
+export PATH="$HOME/.local/bin:$PATH"
+uv run --directory "$PLUGIN_DIR" python -m substack_audio.cli setup_check
 ```
 
 If `ready` is true:
