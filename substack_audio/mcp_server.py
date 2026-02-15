@@ -21,8 +21,10 @@ load_dotenv(override=True)
 
 mcp = FastMCP("Substack Audio")
 
-# Resolve paths relative to the project root (where .mcp.json lives).
-_PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", ".")).resolve()
+# Default project root to the plugin's own directory (parent of substack_audio/).
+# This way everything works zero-config when installed as a Claude Desktop plugin.
+# Users can override with PROJECT_ROOT env var to store data elsewhere.
+_PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", str(Path(__file__).resolve().parent.parent))).resolve()
 
 
 def _state_file() -> Path:

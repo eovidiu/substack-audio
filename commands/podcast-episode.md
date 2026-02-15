@@ -64,15 +64,30 @@ Show:
 - File size
 - Total episodes in feed
 
-### Step 7: Ask about git
+### Step 7: Ask about saving to project folder
+Ask: "Would you like me to copy the generated files (audio, feed, episode data) to your project folder for version control?"
+
+If yes, ask for the target folder path (or use the current working directory). Then copy:
+```bash
+mkdir -p <target>/data <target>/output/public/audio
+cp <plugin-cache>/output/public/audio/<audio_file> <target>/output/public/audio/
+cp <plugin-cache>/output/public/feed.xml <target>/output/public/
+cp <plugin-cache>/data/episodes.json <target>/data/
+cp <plugin-cache>/data/state.json <target>/data/
+```
+
+The source paths come from the `generate_audio` and `update_feed` tool responses.
+
+### Step 8: Ask about git
 Ask: "Ready to commit and push the new episode to GitHub? This will update the feed on GitHub Pages."
 
-If confirmed, run:
+If confirmed, run from the target project folder:
 ```bash
+cd <target>
 git add data/episodes.json data/state.json output/public/feed.xml output/public/audio/
 git commit -m "Add episode: <title>"
 git push origin main
 ```
 
-### Step 8: Cleanup
+### Step 9: Cleanup
 After a successful git push, call the `cleanup` tool to remove any leftover temporary audio chunks (`.part*.mp3` files) from the output directory.
